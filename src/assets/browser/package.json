@@ -1,0 +1,11 @@
+{
+    "name": "browser-playground",
+    "version": "0.0.1",
+    "description": "",
+    "main": "index.html",
+    "author": "",
+    "dependencies": {
+    },
+    "devDependencies": {
+    }
+}
