@@ -1,13 +1,9 @@
 import browserSync from "browser-sync";
-import chokidar from 'chokidar';
 import historyApiFallback = require('connect-history-api-fallback');
-import { writeFile, existsSync, ensureDirSync } from 'fs-extra';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, buildLogStart, CopyAction, network, ProcessManager, transpileBrowser } from './utils';
+import { BuilderUtil, network, transpileBrowser } from './utils';
 import chalk from 'chalk';
-
-const { log } = console;
 
 export async function devBuildBrowser(opts: {
     /** Directory of entry file relative to `projectRoot`. Eg: `"./src" or "src"`.
@@ -70,14 +66,15 @@ export async function devBuildBrowser(opts: {
     log('STARTING BUILDER...');
 
     const port = opts.port || 3000;
+
     const projectRoot = path.resolve(opts.projectRoot || './');
     const fromDir = join(projectRoot, opts.fromDir);
     const entryFile = join(fromDir, opts.entryFile);
     const toDir = join(projectRoot, opts.toDir);
     const watchOtherDirs = (opts.watchOtherDirs || []).map((dir) => join(projectRoot, dir));
+    const copyFiles = (opts.copyFiles || []);
     const jsExts = opts.jsExts || ['tsx', 'ts', 'js', 'jsx'];
     const cssExts = opts.cssExts || ['sass', 'scss', 'css'];
-    const copyFiles = (opts.copyFiles || []);
     const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
 
     // clearing and canceling on exit //
@@ -155,7 +152,6 @@ export async function devBuildBrowser(opts: {
         log(chalk.red`FAILED FIRST BUILD`);
     }
 
-
     bs.init({
         server: toDir,
         middleware: [ historyApiFallback() ],
@@ -165,122 +161,5 @@ export async function devBuildBrowser(opts: {
         port,
         ghostMode: false,
         host: network(),
-    });
-}
-
-export async function nodejsPlayGround(opts: {
-    fromDir?: string;
-    entryFile?: string;
-    toDir?: string;
-    watchOtherDirs?: string[];
-    cssExts?: string[];
-    jsExts?: string[];
-    projectRoot?: string;
-    copyFiles?: string[];
-    debounceMs?: number;
-    // port?: number;
-} = { }) {
-    const fromDir = resolve(opts.fromDir || 'playground/nodejs');
-    const entryFile = join(fromDir, 'server.ts');
-    const toDir = resolve(opts.toDir || '.temp/nodejs');
-    const outFile = entryFile.replace(fromDir, toDir).replace('.ts', '.js');
-    const watchOtherDirs = (opts.watchOtherDirs || ['src']).map((dir) => path.resolve(dir));
-    const copyFiles = (opts.copyFiles || []);
-    const jsExts = ['ts', 'js'];
-    const projectRoot = path.resolve(opts.projectRoot || './');
-    const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
-    
-    // Prepare the playground folders with files //
-    [fromDir, toDir].forEach(async dir => ensureDirSync(dir));
-
-    Object.entries(nodejsFiles()).forEach(([fileName, txt]) => {
-        if (!existsSync(join(fromDir, fileName)))
-            writeFile(join(fromDir, fileName), txt);
-    });
-
-    // clearing and canceling on exit //
-    [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`]
-    .forEach((eventType) => process.on(eventType, () => {
-        copyWatcher && copyWatcher.close();
-        jsWatcher.close();
-        process.exit();
-    }));
-
-    // initialized builder //
-    const builder = new BuilderUtil({
-        fromDir, toDir, projectRoot, copyFiles,
-        buildFct: () => transpileBrowser(entryFile, toDir, { changeBuildOpts: { incremental: true } })
-    });
-
-    // Setup watchers //
-    const allWatchDirs = [fromDir, ...watchOtherDirs.map(dir => resolve(dir))];
-    const copyWatch = !!copyFiles.length && builder.info().copyFiles.map(x => x.from);
-    const jsWatch: string[] = [];
-
-    allWatchDirs.forEach((dir) => {
-        jsExts.forEach(ext =>
-            jsWatch.push(path.join(dir, '**', '*.' + ext)));
-    });
-
-    const jsWatcher = chokidar.watch(jsWatch);
-    const copyWatcher = copyWatch && chokidar.watch(copyWatch);
-
-    let copyChanged: { file: string; action: CopyAction; }[] = [];
-    let jsChanged = false;
-    const debounce = debounceTimeOut();
-    const watchHandler = (opts: { type: 'js' } | { type: 'copy', file: { file: string; action: CopyAction; } }) => {
-        switch (opts.type) {
-            case 'js':
-                jsChanged = true;
-                break;
-            case 'copy':
-                copyChanged.push(opts.file);
-                break;
-            default:
-                break;
-        }
-        
-        debounce(async () => {
-            const { fromDir: from, toDir: to, projectRoot: root } = builder.info();
-            const logger = buildLogStart({ from, to, root });
-
-            const copyFl = copyChanged;
-            copyChanged = [];
-
-            if (jsChanged) {
-                await builder.build({ logTime: false });
-            }
-            
-            if (copyFl.length) {
-                await builder.fileCopyAction(copyFl);
-            }
-            
-            logger.end();
-            log(`> Restarting ${chalk.green('Nodejs')} App...`);
-            app.reload();
-        }, debounceMs);
-    };
-
-    await (new Promise((res) => {
-        let i = copyWatcher ? 0 : 1;
-        
-        if (copyWatcher)
-            copyWatcher.once('ready', (_) => (++i >= 2) && res(_));
-
-        jsWatcher.once('ready', (_) => (++i >= 2) && res(_));
-    }));
-
-    await builder.cleanToDir();
-    await builder.build();
-    await builder.copy();
-    
-    const app = new ProcessManager('node', [outFile]);
-    
-    jsWatcher.on('all', () => {
-        watchHandler({ type: 'js' });
-    });
-
-    if (copyWatcher) copyWatcher.on('all', async (action, file) => {
-        watchHandler({ type: 'copy', file: { file, action } });
     });
 }

@@ -3,7 +3,7 @@ import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
 import { build as esbuild } from 'esbuild';
 import { debounceTimeOut, Dict, interval, isType } from '@giveback007/util-lib';
-import { copy, lstat, mkdir, remove } from 'fs-extra';
+import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
 import chokidar from 'chokidar';
 import chalk from 'chalk';
@@ -12,7 +12,7 @@ import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 
 const { log } = console;
 
-type CopyFromTo = { from: string; to: string; }
+type CopyFromTo = { from: string; to: string; };
 export type CopyAction = 'add'|'addDir'|'change'|'unlink'|'unlinkDir'|'copy';
 export type NodeTranspiler = (files: string[], toDir: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
 export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {changeBuildOpts?: BuildOptions, envVars?: Dict<string>}) => Promise<BuildResult>;
@@ -279,6 +279,12 @@ export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts
 // log('It Works!')`
 // });
 
+// PREVIOUS:
+// Object.entries(browserFiles()).forEach(([fileName, txt]) => {
+//     if (!existsSync(join(fromDir, fileName)))
+//         writeFile(join(fromDir, fileName), txt);
+// });
+
 export function network() {
     let ip: string | undefined;
     const ifaces = networkInterfaces();
@@ -298,8 +304,6 @@ export class ProcessManager {
         private readonly command: string,
         private readonly args?: string[],
     ) {
-        log(command);
-        // TODO source maps
         this.app = this.spawnChild();
         this.init();
     }
@@ -331,10 +335,25 @@ export class ProcessManager {
         this.app.stdout.pipe(process.stdout);
         this.app.stderr.pipe(process.stderr);
 
-        this.app.on('exit', (_: number, signal: NodeJS.Signals) => log(
-            `> ${chalk.green('Nodejs')} App exited with signal: ${chalk.blue(signal)}`,
+        this.app.on('exit', (_, signal) => log(
+            `> ${chalk.green('Nodejs')} exit with: ${chalk.blue(signal)}`,
         ));
     };
 
     private spawnChild = () => spawn(this.command, this.args || []);
+}
+
+export async function ensureStarterFiles(opts: { root: string; fromDir: string, starterFilesDir: string }) {
+    const root = path.resolve(opts.root);
+    const fromDir = join(root, opts.fromDir);
+
+    if (!existsSync(fromDir)) {
+        await ensureDir(fromDir);
+
+        // const startFiles = opts.starterFilesDir ? join(root, opts.starterFilesDir) : join(__dirname, 'assets/browser');
+        await Promise.all(readdirSync(opts.starterFilesDir).map((fl) => BuilderUtil.copyFileHandler({
+            from: join(opts.starterFilesDir, fl),
+            to: join(fromDir, fl)
+        })));
+    }
 }

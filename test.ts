@@ -1,4 +1,4 @@
-import { browserPlayground } from './src/browser';
+import { browserPlay } from './src/browser.play';
 
 // devBuildBrowser({
 //     toDir: '.temp/web',
@@ -8,4 +8,4 @@ import { browserPlayground } from './src/browser';
 //     copyFiles: ['index.html', 'fav.ico']
 // });
 
-browserPlayground();
+// browserPlayground();
