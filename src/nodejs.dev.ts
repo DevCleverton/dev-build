@@ -1,10 +1,7 @@
 import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, buildLogStart, CopyAction, ProcessManager, transpileBrowser } from './utils';
-import chalk from 'chalk';
-
-const { log } = console;
+import { BuilderUtil, buildLogStart, CopyAction, ProcessManager, transpileNode } from './utils';
 
 export async function devBuildNodejs(opts: {
     fromDir: string;
@@ -38,7 +35,7 @@ export async function devBuildNodejs(opts: {
     // initialized builder //
     const builder = new BuilderUtil({
         fromDir, toDir, projectRoot, copyFiles,
-        buildFct: () => transpileBrowser(entryFile, toDir, { changeBuildOpts: { incremental: true } })
+        buildFct: () => transpileNode(entryFile, outFile, { changeBuildOpts: { incremental: true } })
     });
 
     // Setup watchers //
@@ -85,7 +82,6 @@ export async function devBuildNodejs(opts: {
             }
             
             logger.end();
-            log(`> Restarting ${chalk.green('Nodejs')} App...`);
             app.reload();
         }, debounceMs);
     };

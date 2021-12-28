@@ -1,4 +1,5 @@
-import { browserPlay } from './src/browser.play';
+// import { browserPlay } from './src/browser.play';
+import { nodejsPlay } from './src/nodejs.play';
 
 // devBuildBrowser({
 //     toDir: '.temp/web',
@@ -9,3 +10,5 @@ import { browserPlay } from './src/browser.play';
 // });
 
 // browserPlayground();
+
+nodejsPlay();

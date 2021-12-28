@@ -2,7 +2,7 @@ import type { BuildOptions, BuildResult } from 'esbuild';
 import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
 import { build as esbuild } from 'esbuild';
-import { debounceTimeOut, Dict, interval, isType } from '@giveback007/util-lib';
+import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objVals, rand, sec } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
 import chokidar from 'chokidar';
@@ -14,7 +14,8 @@ const { log } = console;
 
 type CopyFromTo = { from: string; to: string; };
 export type CopyAction = 'add'|'addDir'|'change'|'unlink'|'unlinkDir'|'copy';
-export type NodeTranspiler = (files: string[], toDir: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
+// export type NodeTranspiler = (files: string[], toDir: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
+export type NodeTranspiler = (entryFile: string, outFile: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
 export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {changeBuildOpts?: BuildOptions, envVars?: Dict<string>}) => Promise<BuildResult>;
 
 export type BuilderOpt = {
@@ -154,22 +155,34 @@ export class BuilderUtil {
     }
 }
 
+export function timeString(t: number) {
+    if (t < 500) return `${t}ms`;
+    if (t < min(1)) return (t / 1000).toFixed(1) + 's';
+    const { d, h, m, s } = msToTime(t, true);
+    const hours = (h || d) ? minAppend(h + d * 24, 2) + 'h ' : '';
+    const mins = m ? minAppend(m, 2) + 'm ' : '';
+    const secs = minAppend(s, 2) + 's';
+
+    return hours + mins + secs;
+}
+
 export function buildLogStart(opts: {
     from: string;
     to: string;
     root: string;
 }) {
+    const { frames, interval: frameMs } = spinners[rand(0, spinners.length - 1)];
     const { from, to, root } = opts;
     const fromTo = `[${chalk.green(from).replace(root, '')}] ${chalk.yellow`-→`} [${chalk.green(to).replace(root, '')}]`;
 
     const timeStart = Date.now();
-    const itv = interval(() => {
+    const itv = interval((i) => {
         const t = Date.now() - timeStart;
 
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0);
-        process.stdout.write(`> ⌛ ${chalk.blueBright`Building`} ${(t / 1000).toFixed(2)}s: ${fromTo}`);
-    }, 350);
+        process.stdout.write(`> ${frames[i % frames.length]} ${chalk.blueBright`Building`} ${(t / 1000).toFixed(2)}s: ${fromTo}`);
+    }, frameMs * 1.5);
 
     return {
         end: () => {
@@ -181,7 +194,7 @@ export function buildLogStart(opts: {
             const isMs = t < 500;
             const timeStr = (isMs ? t : (t / 1000).toFixed(2)) + (isMs ? 'ms' : 's');
 
-            log(`> ✅ ${chalk.blueBright`Built in`} ${timeStr}: ${fromTo}`);
+            log(`> ${chalk.green`✔`} ${chalk.blueBright`Built in`} ${timeStr}: ${fromTo}`);
         }
     };
 }
@@ -218,6 +231,30 @@ export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts
         ...opts.changeBuildOpts,
     });
 };
+
+export const transpileNode: NodeTranspiler = async (entryFile, outFile, opts = {}) => {
+    const buildOpts: BuildOptions = {
+        entryPoints: [entryFile],
+        outfile: outFile,
+        define: (() => {
+            /** global && window -> globalThis */
+            const v: Dict<string> = {"global": "globalThis", "window": "globalThis"};
+            // Object.entries(opts?.envVars || {}).forEach(([k, v]) => v[k] = `"${v}"`);
+            return v;
+        })(),
+        target: 'node14',
+        platform: 'node',
+        bundle: true,
+        sourcemap: true,
+        preserveSymlinks: true,
+        // plugins: [esbuildDecorators({ tsconfig: './tsconfig.json' }),],
+    };
+
+    return await esbuild({
+        ...buildOpts,
+        ...opts.changeBuildOpts,
+    });
+}
 
 // export const browserFiles = () => ({
 //     'package.json': /* json */
@@ -300,18 +337,18 @@ export function network() {
 
 export class ProcessManager {
     private app: ChildProcessWithoutNullStreams;
+    private appStartTime = 0;
+
     constructor(
         private readonly command: string,
         private readonly args?: string[],
     ) {
         this.app = this.spawnChild();
-        this.init();
     }
 
     reload = async () => {
         await this.kill();
         this.app = this.spawnChild();
-        this.init();
     };
 
     kill = () => new Promise<void>(res => {
@@ -331,16 +368,19 @@ export class ProcessManager {
         }
     });
 
-    private init = () => {
-        this.app.stdout.pipe(process.stdout);
-        this.app.stderr.pipe(process.stderr);
+    private spawnChild = () => {
+        const app = spawn(this.command, this.args || []);
+        app.stdout.pipe(process.stdout);
+        app.stderr.pipe(process.stderr);
 
-        this.app.on('exit', (_, signal) => log(
-            `> ${chalk.green('Nodejs')} exit with: ${chalk.blue(signal)}`,
-        ));
+        app.on('spawn', () => this.appStartTime = Date.now());
+        app.on('exit', (_, signal) => {
+            const time = chalk.yellow`${timeString(Date.now() - this.appStartTime)}`;
+            log(`> ${chalk.green('Nodejs')}: | time: ${time} | exit: ${chalk.blue(signal)} |`);
+        });
+
+        return app;
     };
-
-    private spawnChild = () => spawn(this.command, this.args || []);
 }
 
 export async function ensureStarterFiles(opts: { root: string; fromDir: string, starterFilesDir: string }) {
@@ -357,3 +397,37 @@ export async function ensureStarterFiles(opts: { root: string; fromDir: string, 
         })));
     }
 }
+
+const spinners: {
+    interval: number;
+    frames: string[];
+}[] = objVals({
+    dots:{interval:180,frames:["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]},
+    dots2:{interval:180,frames:['⣷', '⣯', '⣟', '⡿', '⢿', '⣻', '⣽', '⣾']},
+    line:{interval:180,frames:["-","\\","|","/"]},
+    hamburger:{interval:200,frames:['☰', '☱', '☳', '☷', '☶', '☴']},
+    boxBounce:{interval:200,frames:["▖","▘","▝","▗"]},
+    arc:{interval:200,frames:["◜","◠","◝","◞","◡","◟"]},
+    squareCorners:{interval:200,frames:["◰","◳","◲","◱"]},
+    circleHalves:{interval:150,frames:["◐","◓","◑","◒"]},
+    toggle:{interval:300,frames:["⊶ ","⊷ "]},
+    arrow:{interval:180,frames:["←","↖","↑","↗","→","↘","↓","↙"]},
+    arrow2:{interval:180,frames:["⬆️ ","↗️ ","➡️ ","↘️ ","⬇️ ","↙️ ","⬅️ ","↖️ "]},
+    smiley:{interval:250,frames:["😃 ","😄 ", "😆 ", "😝 ", "😆 ", "😄 "]},
+    monkey:{interval:250,frames:["🙈 ","🙈 ","🙉 ","🙊 "]},
+    // hearts:{interval:250,frames:["💛 ","💙 ","💜 ","💚 ","❤️ "]},
+    squares:{interval:250,frames:["🟥","🟧","🟨","🟩","🟦","🟪","🟦","🟩","🟨","🟧"]},
+    clock:{interval:180,frames:["🕛","🕐","🕑","🕒","🕓","🕔","🕕","🕖","🕗","🕘","🕙","🕚"]},
+    earth:{interval:200,frames:["🌍","🌏","🌎"]},
+    moon:{interval:180,frames:["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"]},
+    runner:{interval:220,frames:["🚶","🏃"]},
+    dqpb:{interval:150,frames:["d","q","p","b"]},
+    point:{interval:190,frames:["∙∙∙","●∙∙","∙●∙","∙∙●","∙∙∙"]},
+    // hand1:{interval:350,frames:['✋','🖐️','🖖']},
+    box1: {interval: 200,frames:['▁','▃','▄','▅','▆','▇','█','▇','▆','▅','▄','▃']},
+    pong:{interval:80,frames:["▐⠂       ▌","▐⠈       ▌","▐ ⠂      ▌","▐ ⠠      ▌","▐  ⡀     ▌","▐  ⠠     ▌","▐   ⠂    ▌","▐   ⠈    ▌","▐    ⠂   ▌","▐    ⠠   ▌","▐     ⡀  ▌","▐     ⠠  ▌","▐      ⠂ ▌","▐      ⠈ ▌","▐       ⠂▌","▐       ⠠▌","▐       ⡀▌","▐      ⠠ ▌","▐      ⠂ ▌","▐     ⠈  ▌","▐     ⠂  ▌","▐    ⠠   ▌","▐    ⡀   ▌","▐   ⠠    ▌","▐   ⠂    ▌","▐  ⠈     ▌","▐  ⠂     ▌","▐ ⠠      ▌","▐ ⡀      ▌","▐⠠       ▌"]},
+    bouncingBar:{interval:180,frames:["[    ]","[=   ]","[==  ]","[=== ]","[ ===]","[  ==]","[   =]"]},
+    bouncingBall:{interval:180,frames:["( ●    )","(  ●   )","(   ●  )","(    ● )","(     ●)","(    ● )","(   ●  )","(  ●   )","( ●    )","(●     )"]},
+    arrow3:{interval:200,frames:["▸▹▹▹▹","▹▸▹▹▹","▹▹▸▹▹","▹▹▹▸▹","▹▹▹▹▸","▹▹▹▸▹","▹▹▸▹▹","▹▸▹▹▹"]},
+    simpleDots:{interval:300,frames:[".  ",".. ","..."," ..","  .", "   "]}
+});
