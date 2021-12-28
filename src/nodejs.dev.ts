@@ -1,9 +1,9 @@
 import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, buildLogStart, CopyAction, ProcessManager, transpileNode } from './utils';
+import { BuilderUtil, buildLogStart, CopyAction, genWatchPaths, onProcessEnd, ProcessManager, transpileNode, waitForFSWatchersReady } from './general.utils';
 
-export async function devBuildNodejs(opts: {
+export async function devNodejs(opts: {
     fromDir: string;
     entryFile: string;
     toDir: string;
@@ -20,17 +20,16 @@ export async function devBuildNodejs(opts: {
     const toDir = join(projectRoot, opts.toDir); // '.temp/nodejs'
     const watchOtherDirs = (opts.watchOtherDirs || []).map(dir => join(projectRoot, dir)); // 'src'
     const copyFiles = (opts.copyFiles || []);
-    const jsExts = opts.jsExts || ['ts', 'js'];
+    const jsExts = opts.jsExts || ['ts', 'js', 'json'];
     const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
     const outFile = entryFile.replace(fromDir, toDir).replace('.ts', '.js');
 
     // clearing and canceling on exit //
-    [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`]
-    .forEach((eventType) => process.on(eventType, () => {
+    onProcessEnd(() => {
         copyWatcher && copyWatcher.close();
         jsWatcher.close();
         process.exit();
-    }));
+    });
 
     // initialized builder //
     const builder = new BuilderUtil({
@@ -41,12 +40,7 @@ export async function devBuildNodejs(opts: {
     // Setup watchers //
     const allWatchDirs = [fromDir, ...watchOtherDirs.map(dir => resolve(dir))];
     const copyWatch = !!copyFiles.length && builder.info().copyFiles.map(x => x.from);
-    const jsWatch: string[] = [];
-
-    allWatchDirs.forEach((dir) => {
-        jsExts.forEach(ext =>
-            jsWatch.push(path.join(dir, '**', '*.' + ext)));
-    });
+    const jsWatch = genWatchPaths(allWatchDirs, jsExts);
 
     const jsWatcher = chokidar.watch(jsWatch);
     const copyWatcher = copyWatch && chokidar.watch(copyWatch);
@@ -87,14 +81,7 @@ export async function devBuildNodejs(opts: {
     };
 
     // wait for both watchers to be ready
-    await (new Promise((res) => {
-        let i = copyWatcher ? 0 : 1;
-        
-        if (copyWatcher)
-            copyWatcher.once('ready', () => (++i >= 2) && res(0));
-
-        jsWatcher.once('ready', () => (++i >= 2) && res(0));
-    }));
+    await waitForFSWatchersReady([copyWatcher, jsWatcher]);
 
     await builder.cleanToDir();
     await builder.build();

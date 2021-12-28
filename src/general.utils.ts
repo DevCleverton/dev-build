@@ -1,8 +1,8 @@
 import type { BuildOptions, BuildResult } from 'esbuild';
+import { build as esbuild } from 'esbuild';
 import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
-import { build as esbuild } from 'esbuild';
-import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objVals, rand, sec } from '@giveback007/util-lib';
+import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objVals, rand } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
 import chokidar from 'chokidar';
@@ -383,10 +383,14 @@ export class ProcessManager {
     };
 }
 
-export async function ensureStarterFiles(opts: { root: string; fromDir: string, starterFilesDir: string }) {
+export async function ensureStarterFiles(opts: {
+    root: string; fromDir: string; starterFilesDir: string; overwrite?: boolean
+}) {
+    const { overwrite } = opts;
     const root = path.resolve(opts.root);
     const fromDir = join(root, opts.fromDir);
 
+    if (overwrite) await remove(fromDir);
     if (!existsSync(fromDir)) {
         await ensureDir(fromDir);
 
@@ -416,7 +420,7 @@ const spinners: {
     smiley:{interval:250,frames:["😃 ","😄 ", "😆 ", "😝 ", "😆 ", "😄 "]},
     monkey:{interval:250,frames:["🙈 ","🙈 ","🙉 ","🙊 "]},
     // hearts:{interval:250,frames:["💛 ","💙 ","💜 ","💚 ","❤️ "]},
-    squares:{interval:250,frames:["🟥","🟧","🟨","🟩","🟦","🟪","🟦","🟩","🟨","🟧"]},
+    squares:{interval:250,frames:["🟥","🟧","🟨","🟧"]},
     clock:{interval:180,frames:["🕛","🕐","🕑","🕒","🕓","🕔","🕕","🕖","🕗","🕘","🕙","🕚"]},
     earth:{interval:200,frames:["🌍","🌏","🌎"]},
     moon:{interval:180,frames:["🌑","🌒","🌓","🌔","🌕","🌖","🌗","🌘"]},
@@ -431,3 +435,31 @@ const spinners: {
     arrow3:{interval:200,frames:["▸▹▹▹▹","▹▸▹▹▹","▹▹▸▹▹","▹▹▹▸▹","▹▹▹▹▸","▹▹▹▸▹","▹▹▸▹▹","▹▸▹▹▹"]},
     simpleDots:{interval:300,frames:[".  ",".. ","..."," ..","  .", "   "]}
 });
+
+export const onProcessEnd = (fct: (exitCode: number) => unknown) =>
+    [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`].forEach(ev => process.on(ev, fct));
+
+export const genWatchPaths = (dirs: string[], exts: string[]) =>
+    dirs.map(d => exts.map(ex => join(d, '**', '*.' + ex))).flat(Infinity) as string[];
+
+export async function waitForFSWatchersReady(watchers: (undefined | null | false | chokidar.FSWatcher)[]) {
+    const arr = watchers.filter(x => x) as chokidar.FSWatcher[];
+    const n = arr.length;
+    if (!n) return;
+
+    let i = 0;
+
+    await (new Promise((res) =>
+        arr.forEach(w => w.once('ready', () => (++i === n) && res(0)))));
+}
+
+export async function filesAndDirs(files: string[]) {
+    const fls: string[] = [];
+    const dirs: string[] = [];
+
+    const p = files.map(async fl =>
+        (await lstat(fl)).isDirectory() ? dirs.push(fl) : fls.push(fl));
+
+    await Promise.all(p);
+    return [fls, dirs];
+}

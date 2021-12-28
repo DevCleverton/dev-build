@@ -1,11 +1,11 @@
 import browserSync from "browser-sync";
 import historyApiFallback = require('connect-history-api-fallback');
-import path, { join, resolve } from 'path';
+import path, { join } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, network, transpileBrowser } from './utils';
+import { BuilderUtil, network, onProcessEnd, transpileBrowser, genWatchPaths } from './general.utils';
 import chalk from 'chalk';
 
-export async function devBuildBrowser(opts: {
+export async function devBrowser(opts: {
     /** Directory of entry file relative to `projectRoot`. Eg: `"./src" or "src"`.
      * 
      * Resolution order: [projectRoot + fromDir + entryFile]
@@ -26,14 +26,15 @@ export async function devBuildBrowser(opts: {
      * Eg: `['utils', 'common']`
      */
     watchOtherDirs?: string[];
-    /** List of css extensions to watch for changes.
+    /** List of css extensions to watch for changes. This will only build css files and hot-reload
+     * them without refreshing the browser.
      * 
      * Default: `['sass', 'scss', 'css']`. Specifying this replaces the defaults completely.
      */
     cssExts?: string[];
-    /** List of js/ts extensions to watch for changes.
+    /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
      * 
-     * Default: `['tsx', 'ts', 'js', 'jsx']`. Specifying this replaces the defaults completely.
+     * Default: `['tsx', 'ts', 'js', 'jsx', 'json']`. Specifying this replaces the defaults completely.
      */
     jsExts?: string[];
     /** Relative path of project root. Eg `"./"` or `"./my-project"`
@@ -73,18 +74,17 @@ export async function devBuildBrowser(opts: {
     const toDir = join(projectRoot, opts.toDir);
     const watchOtherDirs = (opts.watchOtherDirs || []).map((dir) => join(projectRoot, dir));
     const copyFiles = (opts.copyFiles || []);
-    const jsExts = opts.jsExts || ['tsx', 'ts', 'js', 'jsx'];
+    const jsExts = opts.jsExts || ['tsx', 'ts', 'js', 'jsx', 'json'];
     const cssExts = opts.cssExts || ['sass', 'scss', 'css'];
     const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
 
     // clearing and canceling on exit //
-    [`exit`, `SIGINT`, `SIGUSR1`, `SIGUSR2`, `uncaughtException`, `SIGTERM`]
-    .forEach((eventType) => process.on(eventType, () => {
+    onProcessEnd(() => {
         bs.pause();
         bs.cleanup();
         bs.exit();
         process.exit();
-    }));
+    });
 
     // initialized builder //
     const builder = new BuilderUtil({
@@ -96,17 +96,9 @@ export async function devBuildBrowser(opts: {
     const bs = browserSync.create('Browser-Playground');
 
     // Setup watchers //
-    const allWatchDirs = [fromDir, ...watchOtherDirs.map(dir => resolve(dir))];
-    const jsWatch: string[] = [];
-    const cssWatch: string[] = [];
-
-    allWatchDirs.forEach((dir) => {
-        jsExts.forEach(ext =>
-            jsWatch.push(path.join(dir, '**', '*.' + ext)));
-
-        cssExts.forEach(ext =>
-            cssWatch.push(path.join(dir, '**', '*.' + ext)));
-    });
+    const allWatchDirs = [fromDir, ...watchOtherDirs];
+    const jsWatch = genWatchPaths(allWatchDirs, jsExts);
+    const cssWatch= genWatchPaths(allWatchDirs, cssExts);
 
     let cssChanged = false;
     let jsChanged = false;
@@ -125,7 +117,7 @@ export async function devBuildBrowser(opts: {
                 cssChanged = false;
                 bs.reload("*.css");
             } else {
-                log(chalk`Failed to Reload...`);
+                log(chalk.red`Failed to Reload...`);
             }
         }, debounceMs);
     };

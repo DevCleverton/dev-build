@@ -1,7 +1,7 @@
 import { ensureDir } from 'fs-extra';
 import path, { join } from 'path';
-import { ensureStarterFiles } from './utils';
-import { devBuildBrowser } from './browser.dev';
+import { ensureStarterFiles } from './general.utils';
+import { devBrowser } from './browser.dev';
 
 /** Playground for quickly spinning up new ideas without the overhead of the whole project. */
 export async function browserPlay(opts: {
@@ -24,15 +24,17 @@ export async function browserPlay(opts: {
     starterFilesDir?: string,
     /** Other dirs that on change should trigger a build. */
     watchOtherDirs?: string[],
+    /** Setting this to true will delete all files in `playgroundDir` and replace with new starter files. */
+    overwrite?: boolean,
 } = { }) {
+    const { playgroundDir: fromDir = "playground/web", overwrite = false } = opts;
     const root = path.resolve(opts.rootDir || './');
-    const fromDir = opts.playgroundDir || "playground/web";
     const starterFilesDir = opts.starterFilesDir ? join(root, opts.starterFilesDir) : join(__dirname, 'assets/browser');
 
-    await ensureStarterFiles({ root, fromDir, starterFilesDir });
+    await ensureStarterFiles({ root, fromDir, starterFilesDir, overwrite });
     await ensureDir(join(root, opts.outCacheDir || ".temp/web"));
 
-    await devBuildBrowser({
+    await devBrowser({
         projectRoot: opts.rootDir,
         fromDir,
         entryFile: opts.entryFile || 'index.tsx',
