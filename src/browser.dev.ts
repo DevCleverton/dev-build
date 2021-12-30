@@ -100,7 +100,7 @@ export async function devBrowser(opts: {
     // Setup watchers //
     const allWatchDirs = [fromDir, ...watchOtherDirs];
     const jsWatch = genWatchPaths(allWatchDirs, jsExts);
-    const cssWatch= genWatchPaths(allWatchDirs, cssExts);
+    const cssWatch = genWatchPaths(allWatchDirs, cssExts);
 
     let cssChanged = false;
     let jsChanged = false;

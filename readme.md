@@ -20,7 +20,7 @@ $ yarn run build-dev play nodejs
 ## clean playground files and start fresh
 $ yarn run build-dev play nodejs -O
 
-## Watch, run, & reload on save project from source (can run typescript files):
+## Watch, run, & reload on save node project from source (can run typescript files):
 $ yarn run build-dev run ./server/main
 ```
 ## Example Build File
