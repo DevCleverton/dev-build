@@ -1,18 +1,10 @@
+import type { DevBuildOptions } from './general.types';
 import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
 import { BuilderUtil, buildLogStart, CopyAction, genWatchPaths, onProcessEnd, ProcessManager, transpileNode, waitForFSWatchersReady } from './general.utils';
 
-export async function devNodejs(opts: {
-    fromDir: string;
-    entryFile: string;
-    toDir: string;
-    watchOtherDirs?: string[];
-    jsExts?: string[];
-    projectRoot?: string;
-    copyFiles?: string[];
-    debounceMs?: number;
-}) {
+export async function devNodejs(opts: DevBuildOptions) {
     const projectRoot = path.resolve(opts.projectRoot || './');
     const fromDir = join(projectRoot, opts.fromDir); // 'playground/nodejs'
     const entryFile = join(fromDir, opts.entryFile); // 'server.ts'

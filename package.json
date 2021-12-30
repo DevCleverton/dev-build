@@ -1,14 +1,11 @@
 {
   "name": "build-dev",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "Make building projects simple",
   "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "/dist",
-    "/src"
-  ],
+  "files": ["/dist"],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/brainsatplay/dev-build/"
