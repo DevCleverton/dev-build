@@ -12,6 +12,3 @@ export * from './browser.play';
 export * from './nodejs.dev';
 export * from './nodejs.play';
 export * from './nodejs.run';
-
-const isCLI = require.main === module;
-if (isCLI) import('./cli').then(({ runCLI }) => runCLI(process.argv.slice(2)));

@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { runNodejs, browserPlay, nodejsPlay } from '.';
 import chalk from 'chalk';
 import { resolve } from 'path';
@@ -5,7 +7,7 @@ import { existsSync } from 'fs-extra';
 
 const { log } = console;
 
-export function runCLI([cmd1, cmd2, cmd3, ...rest]: string[]) {
+(function runCLI([cmd1, cmd2, cmd3, ...rest]: string[]) {
     const err = (need2nd = false) => {
         log(chalk.red(`${cmd1 || 'Missing-Command-1'}${cmd2 ? (' ' + cmd2) : (need2nd ? ' Missing-Command-2' : '')} not implemented`));
         throw new Error('Invalid CLI Arguments');
@@ -32,4 +34,4 @@ export function runCLI([cmd1, cmd2, cmd3, ...rest]: string[]) {
     } else {
         err();
     }
-}
+})(process.argv.slice(2));
