@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
 import { BuilderUtil } from './src/general.utils';
 // devBuildBrowser({
@@ -10,8 +11,10 @@ import { BuilderUtil } from './src/general.utils';
 
 (async function run([type]) {
     switch (type) {
-        case 'clean:dist':
-            return BuilderUtil.cleanDir('./dist');
+        case 'prep:dist':
+            await BuilderUtil.cleanDir('./dist');
+            await BuilderUtil.copyFileHandler({ from: resolve('src/assets'), to: resolve('dist/assets') });
+            break;
         case 'play:browser':
             return browserPlay();
         case 'play:nodejs':

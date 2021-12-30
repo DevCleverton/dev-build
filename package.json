@@ -16,7 +16,7 @@
   "scripts": {
     "publish-script": "yarn run lint && yarn run build && npm publish",
     "test": "node --trace-warnings -r esbuild-register build.config.ts",
-    "build": "node --trace-warnings -r esbuild-register build.config.ts clean:dist && tsc",
+    "build": "node --trace-warnings -r esbuild-register build.config.ts prep:dist && tsc",
     "lint": "eslint ./src --ext .ts"
   },
   "dependencies": {

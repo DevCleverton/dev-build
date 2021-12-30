@@ -132,23 +132,24 @@ export class BuilderUtil {
                         await remove(to);
                         break;
                     case 'copy':
-                        if ((await lstat(from)).isDirectory())
-                            await mkdir(fl.to, { recursive: true });
-
-                        await copy(fl.from, fl.to);
+                        await copy(from, to);
                         break;
                     default:
                         throw new Error(`Unhandled: "${action}"`);
                 }
                 
                 return { fail: false, file: fl };
-            } catch (e) {
-                return { fail: true, file: fl };
+            } catch (error) {
+                return { fail: true, file: fl, error };
             }
         });
 
-        (await Promise.all(promises)).forEach((x) => x.fail &&
-            log(chalk.red`FAILED TO [${x.file.action || 'copy'}]:\nFrom: ${x.file.from}\nTo: ${x.file.to}`));
+        (await Promise.all(promises)).forEach((x) => {
+            if (x.fail) {
+                log(chalk.red`FAILED TO [${x.file.action || 'copy'}]:\nFrom: ${x.file.from}\nTo: ${x.file.to}`);
+                log(x.error);
+            }
+        });
     }
 
     static async cleanDir(dir: string) {
@@ -434,7 +435,7 @@ const spinners: {
     pong:{interval:80,frames:["▐⠂       ▌","▐⠈       ▌","▐ ⠂      ▌","▐ ⠠      ▌","▐  ⡀     ▌","▐  ⠠     ▌","▐   ⠂    ▌","▐   ⠈    ▌","▐    ⠂   ▌","▐    ⠠   ▌","▐     ⡀  ▌","▐     ⠠  ▌","▐      ⠂ ▌","▐      ⠈ ▌","▐       ⠂▌","▐       ⠠▌","▐       ⡀▌","▐      ⠠ ▌","▐      ⠂ ▌","▐     ⠈  ▌","▐     ⠂  ▌","▐    ⠠   ▌","▐    ⡀   ▌","▐   ⠠    ▌","▐   ⠂    ▌","▐  ⠈     ▌","▐  ⠂     ▌","▐ ⠠      ▌","▐ ⡀      ▌","▐⠠       ▌"]},
     bouncingBar:{interval:180,frames:["[    ]","[=   ]","[==  ]","[=== ]","[ ===]","[  ==]","[   =]"]},
     bouncingBall:{interval:180,frames:["( ●    )","(  ●   )","(   ●  )","(    ● )","(     ●)","(    ● )","(   ●  )","(  ●   )","( ●    )","(●     )"]},
-    arrow3:{interval:200,frames:["▸▹▹▹▹","▹▸▹▹▹","▹▹▸▹▹","▹▹▹▸▹","▹▹▹▹▸","▹▹▹▸▹","▹▹▸▹▹","▹▸▹▹▹"]},
+    arrow3:{interval:200,frames:["▸▹▹▹▹","▹▸▹▹▹","▹▹▸▹▹","▹▹▹▸▹","▹▹▹▹▸"]},
     simpleDots:{interval:300,frames:[".  ",".. ","..."," ..","  .", "   "]}
 });
 

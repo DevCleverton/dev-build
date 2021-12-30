@@ -57,7 +57,8 @@
     },
     "exclude": [
         "node_modules",
-        "playground"
+        "playground",
+        "src/assets"
     ],
     "include": ["src", "types.d.ts", "types.d.ts"],
 }
