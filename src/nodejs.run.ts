@@ -5,12 +5,12 @@ import { filesAndDirs, genWatchPaths, onProcessEnd, ProcessManager, waitForFSWat
 export async function runNodejs(opts: {
     /** Entry file of node .js or .ts file. */
     entryFile: string,
-    /**  */
+    /** Arguments to pass on to Node */
     nodeArgs?: string[],
     /** List of files & directories to watch, if this is not specified the directory that
      * `entryFile` belongs to will be used. */
     watch?: string[],
-    /** List of file extensions to watch. */
+    /** List of file extensions to watch. Default: `['ts', 'js', 'json']` */
     exts?: string[],
 }) {
     const { exts = ['ts', 'js', 'json'], nodeArgs = [] } = opts;

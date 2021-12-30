@@ -72,10 +72,7 @@ export class BuilderUtil {
     }
 
     /** cleans "toDir" */
-    cleanToDir = async () => {
-        await remove(this.toDir);
-        await mkdir(this.toDir, { recursive: true });
-    };
+    cleanToDir = async () => BuilderUtil.cleanDir(this.toDir);
 
     copy = async () => BuilderUtil.copyFileHandler(this.copyFiles);
 
@@ -152,6 +149,11 @@ export class BuilderUtil {
 
         (await Promise.all(promises)).forEach((x) => x.fail &&
             log(chalk.red`FAILED TO [${x.file.action || 'copy'}]:\nFrom: ${x.file.from}\nTo: ${x.file.to}`));
+    }
+
+    static async cleanDir(dir: string) {
+        await remove(dir);
+        await mkdir(dir, { recursive: true });
     }
 }
 
@@ -254,7 +256,7 @@ export const transpileNode: NodeTranspiler = async (entryFile, outFile, opts = {
         ...buildOpts,
         ...opts.changeBuildOpts,
     });
-}
+};
 
 // export const browserFiles = () => ({
 //     'package.json': /* json */

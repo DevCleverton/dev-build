@@ -1,4 +1,5 @@
 import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
+import { BuilderUtil } from './src/general.utils';
 // devBuildBrowser({
 //     toDir: '.temp/web',
 //     fromDir: 'playground/web',
@@ -9,6 +10,8 @@ import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src
 
 (async function run([type]) {
     switch (type) {
+        case 'clean:dist':
+            return BuilderUtil.cleanDir('./dist');
         case 'play:browser':
             return browserPlay();
         case 'play:nodejs':

@@ -2,6 +2,7 @@
   "name": "build-dev",
   "version": "0.0.1",
   "description": "Make building projects simple",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -14,11 +15,9 @@
   },
   "scripts": {
     "publish-script": "yarn run lint && yarn run build && npm publish",
-    "test": "node --trace-warnings -r esbuild-register test.ts",
-    "build": "node --trace-warnings -r esbuild-register esbuild.build.ts build && tsc",
-    "lint": "eslint ./src --ext .ts",
-    "playground:node": "node --trace-warnings -r esbuild-register esbuild.build.ts playground:nodejs",
-    "playground:web": "node --trace-warnings -r esbuild-register esbuild.build.ts playground:browser"
+    "test": "node --trace-warnings -r esbuild-register build.config.ts",
+    "build": "node --trace-warnings -r esbuild-register build.config.ts clean:dist && tsc",
+    "lint": "eslint ./src --ext .ts"
   },
   "dependencies": {
     "@giveback007/util-lib": "0.23.0",

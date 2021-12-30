@@ -8,7 +8,6 @@ export async function devNodejs(opts: {
     entryFile: string;
     toDir: string;
     watchOtherDirs?: string[];
-    cssExts?: string[];
     jsExts?: string[];
     projectRoot?: string;
     copyFiles?: string[];
@@ -40,9 +39,9 @@ export async function devNodejs(opts: {
     // Setup watchers //
     const allWatchDirs = [fromDir, ...watchOtherDirs.map(dir => resolve(dir))];
     const copyWatch = !!copyFiles.length && builder.info().copyFiles.map(x => x.from);
-    const jsWatch = genWatchPaths(allWatchDirs, jsExts);
+    const fileWatch = genWatchPaths(allWatchDirs, jsExts);
 
-    const jsWatcher = chokidar.watch(jsWatch);
+    const jsWatcher = chokidar.watch(fileWatch);
     const copyWatcher = copyWatch && chokidar.watch(copyWatch);
 
     let copyChanged: { file: string; action: CopyAction; }[] = [];

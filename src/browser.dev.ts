@@ -1,9 +1,11 @@
 import browserSync from "browser-sync";
-import historyApiFallback = require('connect-history-api-fallback');
+import historyApiFallback from 'connect-history-api-fallback';
 import path, { join } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
 import { BuilderUtil, network, onProcessEnd, transpileBrowser, genWatchPaths } from './general.utils';
 import chalk from 'chalk';
+
+const { log } = console;
 
 export async function devBrowser(opts: {
     /** Directory of entry file relative to `projectRoot`. Eg: `"./src" or "src"`.

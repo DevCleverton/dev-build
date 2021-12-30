@@ -35,7 +35,7 @@ export async function nodejsPlay(opts: {
         projectRoot: opts.rootDir,
         fromDir,
         entryFile: opts.entryFile || 'server.ts',
-        toDir: opts.outCacheDir || '.temp/node',
+        toDir: opts.outCacheDir || '.temp/nodejs-playground',
         copyFiles: opts.copyFiles,
         watchOtherDirs: opts.watchOtherDirs,
     });

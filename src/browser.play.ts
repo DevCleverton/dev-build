@@ -38,9 +38,9 @@ export async function browserPlay(opts: {
         projectRoot: opts.rootDir,
         fromDir,
         entryFile: opts.entryFile || 'index.tsx',
-        toDir: opts.outCacheDir || '.temp/web',
+        toDir: opts.outCacheDir || '.temp/browser-playground',
         port: opts.port || 3333,
-        copyFiles: opts.copyFiles || ['index.html', 'fav.ico'],
+        copyFiles: opts.copyFiles || ['index.html', 'public'],
         watchOtherDirs: opts.watchOtherDirs,
     });
 }
