@@ -1,8 +1,8 @@
 {
-    "name": "browser-playground",
+    "name": "node-playground",
     "version": "0.0.1",
     "description": "",
-    "browser": "index.html",
+    "main": "index.js",
     "author": "",
     "dependencies": {
     },
