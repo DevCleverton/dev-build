@@ -195,9 +195,9 @@ export function buildLogStart(opts: {
 
             const t = Date.now() - timeStart;
             const isMs = t < 500;
-            const timeStr = (isMs ? t : (t / 1000).toFixed(2)) + (isMs ? 'ms' : 's');
+            const timeStr = isMs ? `${t}ms` : `${(t / 1000).toFixed(2)}s`;
 
-            log(`> ${chalk.green('✔')} ${chalk.blueBright('Built in')} ${timeStr}: ${fromTo}`);
+            log(`> ${chalk.green('✔')} ${chalk.blue('Built in')} ${timeStr}: ${fromTo}`);
         }
     };
 }
