@@ -380,6 +380,7 @@ export class ProcessManager {
         app.on('exit', (_, signal) => {
             const time = chalk.yellow`${timeString(Date.now() - this.appStartTime)}`;
             log(`> ${chalk.green('Nodejs')}: | time: ${time} | exit: ${chalk.blue(signal)} |`);
+            this.kill();
         });
 
         return app;

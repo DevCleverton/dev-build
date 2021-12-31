@@ -17,10 +17,10 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
-"@giveback007/util-lib@0.23.0":
-  version "0.23.0"
-  resolved "https://registry.yarnpkg.com/@giveback007/util-lib/-/util-lib-0.23.0.tgz#0b9840ea0d8006a37bb1e0d2d470da8cec0dd2e9"
-  integrity sha512-u0RmsHa41Oh4eJ34CCrEELJ5djYQscqFpuHdBtHJhVG0vnSCOp1/c9X7prURU9fKIeCA+dmOIYCHWEONm4be5g==
+"@giveback007/util-lib@0.23.1":
+  version "0.23.1"
+  resolved "https://registry.yarnpkg.com/@giveback007/util-lib/-/util-lib-0.23.1.tgz#659487ac583c86cf5c56436db53b42c40bde72a5"
+  integrity sha512-6WS+rcLXlewvs+z2exWmfBGw4YaSZt/glapVEiucuD3yAdWs2trgXmbg/0JQzjeSLOsOzX0CylarKrYnUBycyQ==
   dependencies:
     tslib "~2.0.3"
 

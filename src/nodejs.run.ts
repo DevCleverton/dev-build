@@ -4,33 +4,38 @@ import { filesAndDirs, genWatchPaths, onProcessEnd, ProcessManager, waitForFSWat
 
 export async function runNodejs(opts: {
     /** Entry file of node .js or .ts file. */
-    entryFile: string,
+    entryFile: string;
     /** Arguments to pass on to Node */
-    nodeArgs?: string[],
+    nodeArgs?: string[];
     /** List of files & directories to watch, if this is not specified the directory that
      * `entryFile` belongs to will be used. */
-    watch?: string[],
+    watchDirs?: string[];
     /** List of file extensions to watch. Default: `['ts', 'js', 'json']` */
-    exts?: string[],
+    exts?: string[];
+    /** This will run the file only once (disabling watch mode). */
+    runOnce?: boolean;
 }) {
-    const { exts = ['ts', 'js', 'json'], nodeArgs = [] } = opts;
+    const { exts = ['ts', 'js', 'json'], nodeArgs = [], runOnce } = opts;
     const entryFile = path.resolve(opts.entryFile);
-    const watch = (opts.watch || [dirname(entryFile)]).map(fl => resolve(fl));
+    const watch = (opts.watchDirs || [dirname(entryFile)]).map(fl => resolve(fl));
     const [watchFiles, watchDirs] = await filesAndDirs(watch);
 
     onProcessEnd(() => {
         app.kill();
-        watcher.close();
+        watcher?.close();
     });
 
     const args = ['--enable-source-maps', "--trace-warnings", "-r", "esbuild-register", entryFile, ...nodeArgs];
     const app = new ProcessManager('node', args);
 
     const jsWatch = genWatchPaths(watchDirs, exts);
-    const watcher = chokidar.watch([...jsWatch, ...watchFiles]);
-    await waitForFSWatchersReady([watcher]);
 
-    watcher.on('all', app.reload);
+    let watcher: chokidar.FSWatcher | undefined;
+    if (!runOnce) {
+        watcher = chokidar.watch([...jsWatch, ...watchFiles]);
+        await waitForFSWatchersReady([watcher]);
+        watcher.on('all', app.reload);
+    }
 }
 
 /**
