@@ -1,13 +1,6 @@
 import { resolve } from 'path';
 import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
 import { BuilderUtil } from './src/general.utils';
-// devBuildBrowser({
-//     toDir: '.temp/web',
-//     fromDir: 'playground/web',
-//     entryFile: 'index.tsx',
-//     port: 3333,
-//     copyFiles: ['index.html', 'fav.ico']
-// });
 
 (async function run([type]) {
     switch (type) {

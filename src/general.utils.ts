@@ -197,7 +197,7 @@ export function buildLogStart(opts: {
             const isMs = t < 500;
             const timeStr = (isMs ? t : (t / 1000).toFixed(2)) + (isMs ? 'ms' : 's');
 
-            log(`> ${chalk.green`✔`} ${chalk.blueBright`Built in`} ${timeStr}: ${fromTo}`);
+            log(`> ${chalk.green('✔')} ${chalk.blueBright('Built in')} ${timeStr}: ${fromTo}`);
         }
     };
 }
@@ -378,7 +378,7 @@ export class ProcessManager {
 
         app.on('spawn', () => this.appStartTime = Date.now());
         app.on('exit', (_, signal) => {
-            const time = chalk.yellow`${timeString(Date.now() - this.appStartTime)}`;
+            const time = chalk.yellow(timeString(Date.now() - this.appStartTime));
             log(`> ${chalk.green('Nodejs')}: | time: ${time} | exit: ${chalk.blue(signal)} |`);
             this.kill();
         });
