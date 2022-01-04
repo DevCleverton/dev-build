@@ -2,16 +2,11 @@
 
 import { runNodejs, browserPlay, nodejsPlay } from '.';
 import { equalAny } from '@giveback007/util-lib';
-import chalk from 'chalk';
 import { resolve } from 'path';
 import { existsSync } from 'fs-extra';
+import { logAndExit } from './general.utils';
 
-const { log } = console;
-
-const err = (txt: string) => {
-    log(chalk.bold.red(txt));
-    process.exit();
-};
+const err = logAndExit;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (function CLI([c1 = '', c2, c3, ...rest]: string[]): any {

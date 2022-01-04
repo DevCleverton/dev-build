@@ -2,21 +2,22 @@ import type { BuildOptions, BuildResult } from 'esbuild';
 import { build as esbuild } from 'esbuild';
 import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
-import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objVals, rand } from '@giveback007/util-lib';
+import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objKeyVals, objVals, rand } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
 import chokidar from 'chokidar';
 import chalk from 'chalk';
 import readline from 'readline';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { config } from 'dotenv';
 
 const { log } = console;
 
 type CopyFromTo = { from: string; to: string; };
-export type CopyAction = 'add'|'addDir'|'change'|'unlink'|'unlinkDir'|'copy';
+export type WatchEvent = 'add'|'addDir'|'change'|'unlink'|'unlinkDir'|'copy';
 // export type NodeTranspiler = (files: string[], toDir: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
 export type NodeTranspiler = (entryFile: string, outFile: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
-export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {changeBuildOpts?: BuildOptions, envVars?: Dict<string>}) => Promise<BuildResult>;
+export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {changeBuildOpts?: BuildOptions, envVars?: Dict<string | number | boolean>}) => Promise<BuildResult>;
 
 export type BuilderOpt = {
     projectRoot: string;
@@ -24,6 +25,7 @@ export type BuilderOpt = {
     toDir: string;
     buildFct: () => Promise<BuildResult | void>;
     copyFiles?: string[];
+    watchHandler?: (opts: { name: string; file: string; action: WatchEvent }) => unknown; 
 }
 
 export class BuilderUtil {
@@ -31,10 +33,15 @@ export class BuilderUtil {
     private readonly fromDir: string;
     private readonly toDir: string;
     private readonly buildFct: () => Promise<BuildResult | void>;
+    private readonly watchers: Dict<chokidar.FSWatcher> = {};
+    private readonly watchHandler: BuilderOpt['watchHandler'];
 
     private readonly copyFiles: CopyFromTo[] = [];
 
     constructor(opts: BuilderOpt) {
+        onProcessEnd(() =>
+            objVals(this.watchers).forEach(w => w.close()));
+
         this.projectRoot = path.resolve(opts.projectRoot);
         this.fromDir = path.resolve(opts.fromDir);
         this.toDir = path.resolve(opts.toDir);
@@ -44,6 +51,31 @@ export class BuilderUtil {
 
         fls.forEach((fl) =>
             this.copyFiles.push({ from: join(this.fromDir, fl), to: join(this.toDir, fl) }));
+    }
+
+    addWatcher(name: string, paths: string[]) {
+        if (this.watchers[name]) throw Error(`name: "${name}" already exists`);
+        const watcher = chokidar.watch(paths);
+        if (this.watchersInitialized && this.watchHandler) {
+            const f = this.watchHandler;
+            watcher.on('all', (action, file) => f({ name, action, file }));
+        }
+
+        return this.watchers[name] = watcher;
+
+    }
+
+    private watchersInitialized = false;
+    async initWatchers() {
+        if (this.watchersInitialized) return;
+
+        const watchers = objKeyVals(this.watchers);
+        await waitForFSWatchersReady(watchers.map(({ val }) => val));
+
+        if (this.watchHandler) {
+            const f = this.watchHandler;
+            watchers.forEach(({ key: name, val: w }) => w.on('all', (action, file) => f({ name, action, file })));
+        }
     }
 
     private resolver: (val: 'bounce' | 'built') => void = (_) => void(0);
@@ -104,7 +136,7 @@ export class BuilderUtil {
         }));
     };
 
-    fileCopyAction = <O extends { file: string; action: CopyAction; }>(actions: O | O[]) => {
+    fileCopyAction = <O extends { file: string; action: WatchEvent; }>(actions: O | O[]) => {
         const arr = (isType(actions, 'array') ? actions : [actions]).map(({ file, action }) => ({
             from: file, action, to: file.replace(this.fromDir, this.toDir)
         }));
@@ -112,7 +144,9 @@ export class BuilderUtil {
         return BuilderUtil.copyFileHandler(arr);
     };
 
-    static async copyFileHandler<O extends (CopyFromTo & { action?: CopyAction; })>(handle: O | O[]) {
+
+
+    static async copyFileHandler<O extends (CopyFromTo & { action?: WatchEvent; })>(handle: O | O[]) {
         const arr = isType(handle, 'array') ? handle : [handle];
         if (!arr.length) return;
 
@@ -159,14 +193,18 @@ export class BuilderUtil {
 }
 
 export function timeString(t: number) {
-    if (t < 500) return `${t}ms`;
-    if (t < min(1)) return (t / 1000).toFixed(1) + 's';
-    const { d, h, m, s } = msToTime(t, true);
-    const hours = (h || d) ? minAppend(h + d * 24, 2) + 'h ' : '';
-    const mins = m ? minAppend(m, 2) + 'm ' : '';
-    const secs = minAppend(s, 2) + 's';
-
-    return hours + mins + secs;
+    try {
+        if (t < 500) return `${t}ms`;
+        if (t < min(1)) return (t / 1000).toFixed(1) + 's';
+        const { d, h, m, s } = msToTime(t, true);
+        const hours = (h || d) ? minAppend(h + d * 24, 2) + 'h ' : '';
+        const mins = minAppend(m, 2) + 'm ';
+        const secs = minAppend(s, 2) + 's';
+    
+        return hours + mins + secs;
+    } catch {
+        return msToTime(t);
+    }
 }
 
 export function buildLogStart(opts: {
@@ -202,31 +240,34 @@ export function buildLogStart(opts: {
     };
 }
 
-export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts = {}) => {
-    
+function defineUtil(envVars: Dict<string | boolean | number> = {}) {
+    /** global && window -> globalThis */
+    const v: Dict<string> = {"global": "globalThis", "window": "globalThis"};
+    objKeyVals(envVars).forEach(({ key, val }) => {
+        v[key] = isType(v, 'string') ? `"${val}"` : `${val}`;
+    });
+
+    return v;
+}
+
+export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts = { }) => {
+    const loader: Dict<'file'> = {};
+    const imgExt = [".jpg",".jpeg",".jfif",".pjpeg",".pjp",".png",".svg",".webp",".gif"];
+    const vidExt = ['.mp4','.webm'];
+    const sndExt = ['.mp3', '.wav','.ogg'];
+    const fntExt = ['.ttf','.otf','.eot','.woff','.woff2'];
+    [...imgExt, ...vidExt, ...sndExt, ...fntExt].forEach(ex => loader[ex] = 'file');
+
     const buildOpts: BuildOptions = {
         target: "es2018",
         platform: 'browser',
         entryPoints: [entryFile],
         outdir: toDir,
-        define: (() => {
-            /** global && window -> globalThis */
-            const v: Dict<string> = {"global": "globalThis", "window": "globalThis"};
-            Object.entries(opts?.envVars || {}).forEach(([k, v]) => v[k] = `"${v}"`);
-            return v;
-        })(),
+        define: defineUtil(opts.envVars),
         bundle: true,
         minify: true,
         plugins: [postCssPlugin({ plugins: [ (x: unknown) => x ] }),],
-        loader: {
-            '.png': 'file',
-            '.svg': 'file',
-            '.woff': 'file',
-            '.woff2': 'file',
-            '.ttf': 'file',
-            '.eot': 'file',
-            '.mp3': 'file',
-        }
+        loader,
     };
 
     return await esbuild({
@@ -239,12 +280,7 @@ export const transpileNode: NodeTranspiler = async (entryFile, outFile, opts = {
     const buildOpts: BuildOptions = {
         entryPoints: [entryFile],
         outfile: outFile,
-        define: (() => {
-            /** global && window -> globalThis */
-            const v: Dict<string> = {"global": "globalThis", "window": "globalThis"};
-            // Object.entries(opts?.envVars || {}).forEach(([k, v]) => v[k] = `"${v}"`);
-            return v;
-        })(),
+        define: defineUtil(),
         target: 'node14',
         platform: 'node',
         bundle: true,
@@ -454,7 +490,7 @@ export async function waitForFSWatchersReady(watchers: (undefined | null | false
     let i = 0;
 
     await (new Promise((res) =>
-        arr.forEach(w => w.once('ready', () => (++i === n) && res(0)))));
+        arr.forEach(w => w.once('ready', () => (++i === n) && res(true)))));
 }
 
 export async function filesAndDirs(files: string[]) {
@@ -466,4 +502,35 @@ export async function filesAndDirs(files: string[]) {
 
     await Promise.all(p);
     return [fls, dirs];
+}
+
+export function logAndExit(txt: string, color: 'red' | 'green' | 'blue' | 'yellow' | 'white' = 'red') {
+    log(chalk.bold[color](txt));
+    return process.exit();
+}
+
+export const makeJoinFct = (rootDir: string) => <D extends string | string[]>(toJoin: D): D => {
+    if (isType(toJoin, 'string')) return join(rootDir, toJoin) as D;
+    else return toJoin.map(x => join(rootDir, x)) as D;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const arrEnsure = <T>(x: T): T extends Array<unknown> ? T : T[] => isType(x, 'array') ? x as any : [x];
+
+export const nodeFlags = {
+    register: ['--enable-source-maps', "--experimental-loader", "--trace-warnings", "-r", "esbuild-register"],
+    regular: ['--enable-source-maps', "--experimental-loader", "--trace-warnings"],
+};
+
+export function configEnv(path: string) {
+    const { error, parsed } = config({ path });
+    
+    if (error) {
+        const msg = typeof error === 'string' ? error : error.message;
+        console.log('\x1b[31m%s\x1b[0m', "\nERROR .env' file:\n", '\t' + msg);
+
+        return false;
+    }
+
+    return parsed as Dict<string> || false;
 }

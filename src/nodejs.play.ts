@@ -18,7 +18,7 @@ export async function nodejsPlay(opts: {
      * a different set of starter files you can point to a directory that will be copied from.
      * Eg: `"./playground-init"`.
      */
-     starterFilesDir?: string,
+    starterFilesDir?: string,
      /** Other dirs that on change should trigger a build. */
     watchOtherDirs?: string[],
     /** Setting this to true will delete all files in `playgroundDir` and replace with new starter files. */

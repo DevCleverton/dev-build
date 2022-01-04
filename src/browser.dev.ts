@@ -2,13 +2,18 @@ import type { DevBuildOptions } from "./general.types";
 import browserSync from "browser-sync";
 import historyApiFallback from 'connect-history-api-fallback';
 import path, { join } from 'path';
-import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, network, onProcessEnd, transpileBrowser, genWatchPaths } from './general.utils';
+import { debounceTimeOut, Dict, objKeyVals } from '@giveback007/util-lib';
+import { BuilderUtil, network, onProcessEnd, transpileBrowser, genWatchPaths, configEnv, makeJoinFct, arrEnsure, logAndExit } from './general.utils';
 import chalk from 'chalk';
 
 const { log } = console;
 
 export async function devBrowser(opts: DevBuildOptions & {
+    /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
+     * 
+     * Default: `['tsx', 'ts', 'js', 'jsx', 'json']`. Specifying this replaces the defaults completely.
+     */
+    jsExts?: string[];
     /** List of css extensions to watch for changes. This will only build css files and hot-reload
      * them without refreshing the browser.
      * 
@@ -20,33 +25,59 @@ export async function devBrowser(opts: DevBuildOptions & {
      * Default: `3000`.
      */
     port?: number;
+
+    /** Options for adding environment variables */
+    env?: {
+        /** .env files to add */
+        envFile?: string | string[];
+        /** can define variables here: eg: { isDev: true } -> globalThis.isDev === true */
+        define?: Dict<string | boolean | number>; 
+    }
 }) {
     log('STARTING BUILDER...');
-
-    const port = opts.port || 3000;
-
+    const {
+        port = 3000, debounceMs = 350,
+        cssExts = ['sass', 'scss', 'css'],
+        jsExts = ['tsx', 'ts', 'js', 'jsx', 'json'],
+        copyFiles = [], env,
+    } = opts;
+    
     const projectRoot = path.resolve(opts.projectRoot || './');
-    const fromDir = join(projectRoot, opts.fromDir);
+    const joinRoot = makeJoinFct(projectRoot);
+    
+    const fromDir = joinRoot(opts.fromDir);
     const entryFile = join(fromDir, opts.entryFile);
-    const toDir = join(projectRoot, opts.toDir);
-    const watchOtherDirs = (opts.watchOtherDirs || []).map((dir) => join(projectRoot, dir));
-    const copyFiles = (opts.copyFiles || []);
-    const jsExts = opts.jsExts || ['tsx', 'ts', 'js', 'jsx', 'json'];
-    const cssExts = opts.cssExts || ['sass', 'scss', 'css'];
-    const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
+    const toDir = joinRoot(opts.toDir);
+    const watchOtherDirs = joinRoot(opts.watchOtherDirs || []);
 
     // clearing and canceling on exit //
     onProcessEnd(() => {
-        bs.pause();
-        bs.cleanup();
-        bs.exit();
+        bs?.pause();
+        bs?.cleanup();
+        bs?.exit();
         process.exit();
     });
+
+    const envVars: Dict<string | boolean | number> = {};
+    if (env) {
+        const { define = {}, envFile = [] } = env;
+        
+        arrEnsure(envFile).forEach(fl => {
+            const fileVars = configEnv(joinRoot(fl));
+            if (!fileVars) logAndExit('Env file errors.');
+
+            objKeyVals(fileVars as Dict<string>)
+                .map(({ key, val }) => envVars[key] = val);
+        });
+        
+        objKeyVals(define)
+            .map(({ key, val }) => envVars[key] = val);
+    }
 
     // initialized builder //
     const builder = new BuilderUtil({
         fromDir, toDir, projectRoot, copyFiles,
-        buildFct: () => transpileBrowser(entryFile, toDir, { changeBuildOpts: { incremental: true } })
+        buildFct: () => transpileBrowser(entryFile, toDir, { changeBuildOpts: { incremental: true }, envVars })
     });
 
     // Create browserSync //

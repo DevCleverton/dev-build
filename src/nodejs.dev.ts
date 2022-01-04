@@ -2,16 +2,26 @@ import type { DevBuildOptions } from './general.types';
 import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, buildLogStart, CopyAction, genWatchPaths, onProcessEnd, ProcessManager, transpileNode, waitForFSWatchersReady } from './general.utils';
+import { BuilderUtil, buildLogStart, WatchEvent, genWatchPaths, onProcessEnd, ProcessManager, transpileNode, waitForFSWatchersReady, nodeFlags } from './general.utils';
 
-export async function devNodejs(opts: DevBuildOptions) {
+export async function devNodejs(opts: DevBuildOptions & {
+    /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
+     * 
+     * Default: `['ts', 'js', 'json']`. Specifying this replaces the defaults completely.
+     */
+    exts?: string[];
+
+    /** Arguments to pass on to Node */
+    nodeArgs?: string[];
+}) {
+    const { nodeArgs = [] } = opts;
     const projectRoot = path.resolve(opts.projectRoot || './');
     const fromDir = join(projectRoot, opts.fromDir); // 'playground/nodejs'
     const entryFile = join(fromDir, opts.entryFile); // 'server.ts'
     const toDir = join(projectRoot, opts.toDir); // '.temp/nodejs'
     const watchOtherDirs = (opts.watchOtherDirs || []).map(dir => join(projectRoot, dir)); // 'src'
     const copyFiles = (opts.copyFiles || []);
-    const jsExts = opts.jsExts || ['ts', 'js', 'json'];
+    const jsExts = opts.exts || ['ts', 'js', 'json'];
     const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
     const outFile = entryFile.replace(fromDir, toDir).replace('.ts', '.js');
 
@@ -36,10 +46,10 @@ export async function devNodejs(opts: DevBuildOptions) {
     const jsWatcher = chokidar.watch(fileWatch);
     const copyWatcher = copyWatch && chokidar.watch(copyWatch);
 
-    let copyChanged: { file: string; action: CopyAction; }[] = [];
+    let copyChanged: { file: string; action: WatchEvent; }[] = [];
     let jsChanged = false;
     const debounce = debounceTimeOut();
-    const watchHandler = (opts: { type: 'js' } | { type: 'copy', file: { file: string; action: CopyAction; } }) => {
+    const watchHandler = (opts: { type: 'js' } | { type: 'copy', file: { file: string; action: WatchEvent; } }) => {
         switch (opts.type) {
             case 'js':
                 jsChanged = true;
@@ -78,7 +88,7 @@ export async function devNodejs(opts: DevBuildOptions) {
     await builder.build();
     await builder.copy();
     
-    const app = new ProcessManager('node', ['--enable-source-maps', outFile]);
+    const app = new ProcessManager('node', [...nodeFlags.regular, outFile, ...nodeArgs]);
     
     jsWatcher.on('all', () => {
         watchHandler({ type: 'js' });

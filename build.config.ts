@@ -8,6 +8,7 @@ import { BuilderUtil } from './src/general.utils';
             await BuilderUtil.cleanDir('./dist');
             await BuilderUtil.copyFileHandler({ from: resolve('src/assets'), to: resolve('dist/assets') });
             break;
+        case 'play:web':
         case 'play:browser':
             return browserPlay();
         case 'play:nodejs':

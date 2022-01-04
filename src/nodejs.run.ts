@@ -1,6 +1,6 @@
 import path, { dirname, resolve } from 'path';
 import chokidar from 'chokidar';
-import { filesAndDirs, genWatchPaths, onProcessEnd, ProcessManager, waitForFSWatchersReady } from './general.utils';
+import { filesAndDirs, genWatchPaths, nodeFlags, onProcessEnd, ProcessManager, waitForFSWatchersReady } from './general.utils';
 
 export async function runNodejs(opts: {
     /** Entry file of node .js or .ts file. */
@@ -25,7 +25,7 @@ export async function runNodejs(opts: {
         watcher?.close();
     });
 
-    const args = ['--enable-source-maps', "--trace-warnings", "-r", "esbuild-register", entryFile, ...nodeArgs];
+    const args = [...nodeFlags.register, entryFile, ...nodeArgs];
     const app = new ProcessManager('node', args);
 
     const jsWatch = genWatchPaths(watchDirs, exts);

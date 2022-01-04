@@ -19,11 +19,7 @@ export type DevBuildOptions = {
      * Eg: `['utils', 'common']`
      */
     watchOtherDirs?: string[];
-    /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
-     * 
-     * Default: `['tsx', 'ts', 'js', 'jsx', 'json']`. Specifying this replaces the defaults completely.
-     */
-    jsExts?: string[];
+    
     /** Relative path of project root. Eg `"./"` or `"./my-project"`
      * 
      * Default: `'./'`
