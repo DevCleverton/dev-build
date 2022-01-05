@@ -1,24 +1,26 @@
-// import { isType, equalAny, Dict, objKeys, arrToBoolDict, objVals } from "@giveback007/util-lib";
+// import { isType, equalAny, Dict, objKeys, arrToBoolDict, objVals, debounceTimeOut } from "@giveback007/util-lib";
+// import browserSync from "browser-sync";
 // import { log } from "console";
 // import { pathExists, readFile } from "fs-extra";
 // import path, { basename, extname, join } from 'path';
 // import { dirname } from "path/posix";
-// import { makeJoinFct, logAndExit, arrEnsure } from "./general.utils";
-// import { parse as parseHTML } from 'node-html-parser';
+// import { makeJoinFct, logAndExit, arrEnsure, genWatchPaths, BuilderUtil2, logCl, logAndThrow, WatchHandlerOpts, onProcessEnd } from "./general.utils";
+// import { parse as parseHTML, valid } from 'node-html-parser';
+// import type { BrowserSyncInstance } from "browser-sync";
 
 // /** Allow you to run a browser project straight from an .html entry file.
 //  * 
 //  */
 // export async function browserRun(opts: {
 //     /** Entry file of an .html file. */
-//     entry: string | string[];
+//     entry: string;// | string[];
 
 //     /** Files & directories to watch, by default uses parent directories of
 //      * each .html in `entry`. Same as: `["*entry"]`
 //      * 
-//      * When using this option parent dirs of `entry` will NOT be watched if not specified as well.
+//      * When using this option parent dir of `entry` will NOT be watched if not specified.
 //      * 
-//      * To include parent dirs of every `entry` add: `"*entry"`. Eg: `["*entry", "./common"]`
+//      * To auto include parent dirs of `entry` add: `"*entry"`. Eg: `["*entry", "./common"]`
 //      */
 //     watchDirs?: string[];
 
@@ -26,12 +28,12 @@
 //      * 
 //      * Eg: `['public', 'index.html']` ->
 //      * 
-//      * `"public"` will copy `<fromDir>/public"` into `<toDir>/public` & all contents.
+//      * `"public"` will copy `<rootDir>/public"` into `<toDir>/public` & all contents.
 //      * 
-//      * `"index.html"` will copy `<fromDir>/index.html` into `<toDir>/index.html`.
+//      * `"index.html"` will copy `<rootDir>/index.html` into `<toDir>/index.html`.
 //      * 
-//      * Default: will use (if exists) `./public` folder of the first entry files parent dir.
-//      * Eg: if entry: ["src/index.html"] -> "src/public"
+//      * Default: will use (if exists) `./public` folder of entry files parent dir.
+//      * Eg: if entry: ["src/index.html"] -> (then copy:) "src/public"
 //      */
 //     copyFiles?: string[];
 
@@ -69,7 +71,7 @@
 //      * 
 //      * Will wait `debounceMs` of milliseconds after last file save before starting to build.
 //      * 
-//      * Default: `350`
+//      * Default: `300`
 //      */
 //     debounceMs?: number;
 
@@ -80,11 +82,37 @@
 //         /** can define variables here: eg: { isDev: true } -> globalThis.isDev === true */
 //         define?: Dict<string | boolean>; 
 //     }
+
+//     /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
+//      * 
+//      * Default: `['tsx', 'ts', 'js', 'jsx', 'json']`. Specifying this replaces the defaults completely.
+//      */
+//     jsExts?: string[];
 // }) {
-//     const port = opts.port || 3000;
-//     const debounceMs = isType(opts.debounceMs, 'number') ? opts.debounceMs : 200;
+//     // clearing and canceling on exit //
+//     onProcessEnd(() => {
+//         bs?.pause();
+//         bs?.cleanup();
+//         bs?.exit();
+//         process.exit();
+//     });
+
+//     // Create browserSync //
+//     const bs = browserSync.create('Browser-Playground');
+
+//     const {
+//         port = 3000, debounceMs = 300, env, copyFiles,
+//         cssExts = ['sass', 'scss', 'css'],
+//         jsExts = ['tsx', 'ts', 'js', 'jsx', 'json'],
+//     } = opts;
+    
 //     const rootDir = path.resolve(opts.rootDir || './');
 //     const joinRoot = makeJoinFct(rootDir);
+
+//     /*
+//      * Originally was going to allow multiple entries. (Still may in the future).
+//      * That's why this logic is using array.
+//      */
 
 //     // Resolve and check all entries for errors
 //     const entries = joinRoot(arrEnsure(opts.entry));
@@ -112,6 +140,7 @@
 
 //         // Filter out directories that already have their parent being watched
 //         objKeys(dict).forEach(checkIfParent => objKeys(dict).forEach(dir => {
+//             // if dir being compared contains `checkIfParent` as str then is parent
 //             const hasParent = dir.includes(checkIfParent);
 //             if (hasParent) delete dict[dir];
 //         }));
@@ -119,47 +148,34 @@
 //         return objKeys(dict);
 //     })(opts.watchDirs || ["*entry"]);
 
-//     // go trough each of the html files and parse them
-//     await Promise.all(entries.map(async en => {
-//         const dir = dirname(en);
-//         const html = await readFile(en, 'utf8');
+//     /*
+//      * Watch the dirs now, and if err don't exit just reload on changed
+//      */
 
-//         // get css <link> & js <script> elements
-//         const css = parseHTML(html).querySelectorAll('[build-dev-css]') as unknown as HTMLLinkElement[];
-//         const js = parseHTML(html).querySelectorAll('[build-dev-js]') as unknown as HTMLScriptElement[];
+//     const entryWatch = { name: 'entry', path: entries };
+//     // 1. every time entry changes need to check for if files changed
+//     // 2. handle throw errors in watch handler
 
-//         const cssPaths: string[] = [];
-//         const jsPaths: string[] = [];
-        
-//         // test each one for errors
-//         for (const elm of css) {
-//             if (elm.tagName !== 'LINK') logAndExit(`${elm.toString()} Must be a link element`);
-//             if (elm.rel !== 'stylesheet') logAndExit(`${elm.toString()} Must have 'rel=stylesheet`);
-//             if (!elm.href) logAndExit(`${elm.toString()} Needs href to link to a stylesheet`);
-//             if (!equalAny(extname(elm.href), ['.css', '.scss', '.sass']))
-//                 logAndExit(`For: ${elm.toString()} ${elm.href} needs to link to a ".css", ".scss", or ".sass" file`);
 
-//             const filePath = path.resolve(join(dir, elm.href));
-//             if (!(await pathExists(filePath))) logAndExit(`For: ${elm.toString()}; no file: ${filePath}`);
+//     // const jsWatch = { name: 'js', path: genWatchPaths(watchDirs, jsExts) };
+//     // const cssWatch = { name: 'css', path: genWatchPaths(watchDirs, cssExts) };
+//     // const copyWatch = copyFiles ?
+//     //     { name: 'copy', path: joinRoot(copyFiles) }
+//     //     :
+//     //     { name: '*copy-public', path: join(dirname(entries[0])) };
 
-//             cssPaths.push(filePath);
-//         }
+//     const watch: Dict<string | string[] | null> = {
+//         entry: entries,
+//         js: genWatchPaths(watchDirs, jsExts),
+//         css: genWatchPaths(watchDirs, cssExts),
+//         copy: copyFiles || null,
+//         $public: copyFiles ? null : join(dirname(entries[0]), 'public'),
+//     }
 
-//         for (const elm of js) {
-//             if (elm.tagName !== 'SCRIPT') logAndExit(`${elm.toString()} Must be a script element`);
-//             if (!elm.src) logAndExit(`${elm.toString()} Needs src entry defined`);
-//             if (!equalAny(extname(elm.src), ['.js', '.ts', '.jsx', '.tsx']))
-//                 logAndExit(`For: ${elm.toString()} ${elm.src} needs to link to a '.js', '.ts', '.jsx', or '.tsx' file`);
+//     new BuilderUtil2(watch, watchHandlerInit(bs));
 
-//             const filePath = path.resolve(join(dir, elm.src));
-//             if (!(await pathExists(filePath))) logAndExit(`For: ${elm.toString()}; no file: ${filePath}`);
-
-//             jsPaths.push(filePath);
-//         }
-
-//         // TODO now that I have the css and js path and they are checked for errors ...
-//         // I need to watch for file changes 
-//     }));
+//     // go trough entries for the first time to make sure all is valid
+//     await Promise.all(entries.map(en => onHtml(en)));
 
 //     // conditionally rand
 //     const toDir = opts.toDir;
@@ -177,4 +193,48 @@
 //     // docs: css can be imported using html or js, if done trough js will compile into single index.css file
 
 //     // reload html on: copy|js|html|env
+// }
+
+// const watchHandlerInit = (bs: BrowserSyncInstance) => ({ name, file, action }: WatchHandlerOpts) => {
+//     const debounce = debounceTimeOut();
+// }
+
+// async function onHtml(entry: string) {
+//     const dir = dirname(entry);
+//     const html = await readFile(entry, 'utf8');
+//     if (!valid(html)) logAndThrow(`HTML in: ${entry} is invalid html`);
+
+//     // get css <link> & js <script> elements
+//     const css = parseHTML(html).querySelectorAll('[build-dev-css]') as unknown as HTMLLinkElement[];
+//     const js = parseHTML(html).querySelectorAll('[build-dev-js]') as unknown as HTMLScriptElement[];
+//     if (!js.length) logCl(`${entry}: No script tags with attribute: [build-dev-js]`)
+
+//     const cssPaths: string[] = [];
+//     const jsPaths: string[] = [];
+    
+//     // test each one for errors
+//     for (const elm of css) {
+//         if (elm.tagName !== 'LINK') logAndThrow(`${elm.toString()} Must be a LINK element`);
+//         if (elm.rel !== 'stylesheet') logAndThrow(`${elm.toString()} Must have 'rel=stylesheet`);
+//         if (!elm.href) logAndThrow(`${elm.toString()} Needs href to link to a stylesheet`);
+//         if (!equalAny(extname(elm.href), ['.css', '.scss', '.sass']))
+//             logAndThrow(`For: ${elm.toString()} ${elm.href} needs to link to a ".css", ".scss", or ".sass" file`);
+
+//         const filePath = path.resolve(join(dir, elm.href));
+//         if (!(await pathExists(filePath))) logAndThrow(`For: ${elm.toString()}; no file: ${filePath}`);
+
+//         cssPaths.push(filePath);
+//     }
+
+//     for (const elm of js) {
+//         if (elm.tagName !== 'SCRIPT') logAndThrow(`${elm.toString()} Must be a SCRIPT element`);
+//         if (!elm.src) logAndThrow(`${elm.toString()} Needs "src" entry defined`);
+//         if (!equalAny(extname(elm.src), ['.js', '.ts', '.jsx', '.tsx']))
+//             logAndThrow(`For: ${elm.toString()} ${elm.src} needs to link to a '.js', '.ts', '.jsx', or '.tsx' file`);
+
+//         const filePath = path.resolve(join(dir, elm.src));
+//         if (!(await pathExists(filePath))) logAndThrow(`For: ${elm.toString()}; no file: ${filePath}`);
+
+//         jsPaths.push(filePath);
+//     }
 // }

@@ -2,7 +2,7 @@ import type { BuildOptions, BuildResult } from 'esbuild';
 import { build as esbuild } from 'esbuild';
 import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
-import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objKeyVals, objVals, rand } from '@giveback007/util-lib';
+import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objKeys, objKeyVals, objVals, rand } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
 import chokidar from 'chokidar';
@@ -15,9 +15,71 @@ const { log } = console;
 
 type CopyFromTo = { from: string; to: string; };
 export type WatchEvent = 'add'|'addDir'|'change'|'unlink'|'unlinkDir'|'copy';
+export type WatchHandlerOpts = { name: string; file: string; action: WatchEvent };
+export type WatchHandler = (opts: WatchHandlerOpts) => unknown;
+export type WatchInit = { name: string; paths: string | string[] }[] | Dict<string | string[] | null>;
+
 // export type NodeTranspiler = (files: string[], toDir: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
 export type NodeTranspiler = (entryFile: string, outFile: string, opts?: {changeBuildOpts?: BuildOptions}) => Promise<BuildResult>;
 export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {changeBuildOpts?: BuildOptions, envVars?: Dict<string | number | boolean>}) => Promise<BuildResult>;
+
+export class BuilderUtil2 {
+    private watchers: Dict<chokidar.FSWatcher> = {};
+    private watchHandler?: WatchHandler;
+
+    constructor(
+        addWatchers?: WatchInit,
+        watchHandler?: WatchHandler,
+    ) {
+        onProcessEnd(() => objVals(this.watchers).forEach(w => w?.close()));
+
+        this.watchHandler = watchHandler;
+        if (addWatchers) this.initWatchers({ addWatchers, watchHandler });
+    }
+    
+    async addWatcher(name: string, paths: string[] | string) {
+        if (this.watchers[name]) throw Error(`name: "${name}" already exists`);
+
+        return this.watchers[name] = chokidar.watch(paths);
+    }
+
+    async removeWatchers(names: string | string[]) {
+        const p = arrEnsure(names).map(async nm => {
+            await this.watchers[nm]?.close();
+            delete this.watchers[nm];
+        })
+        
+        await Promise.all(p);
+        return true;
+    }
+    
+    async initWatchers(opts: {
+        addWatchers?: WatchInit,
+        watchHandler?: WatchHandler
+    }): Promise<true> {
+        const { addWatchers, watchHandler } = opts;
+
+        await this.removeWatchers(objKeys(this.watchers));
+        
+        if (addWatchers) {
+            const arr = isType(addWatchers, 'array') ?
+                addWatchers : objKeyVals(addWatchers).map(o => ({ name: o.key, paths: o.val }));
+
+            const p = arr.map(({ name, paths }) => !isType(paths, 'null') && this.addWatcher(name, paths));
+            await Promise.all(p);
+        }
+
+        const watchers = Object.entries(this.watchers);
+        await waitForFSWatchersReady(watchers.map(([, w]) => w));
+
+        if (watchHandler || this.watchHandler) {
+            const f = this.watchHandler = watchHandler || this.watchHandler as WatchHandler;
+            watchers.forEach(([name, w]) => w.on('all', (action, file) => f({ name, action, file })));
+        }
+
+        return true;
+    }
+}
 
 export type BuilderOpt = {
     projectRoot: string;
@@ -53,16 +115,16 @@ export class BuilderUtil {
             this.copyFiles.push({ from: join(this.fromDir, fl), to: join(this.toDir, fl) }));
     }
 
-    addWatcher(name: string, paths: string[]) {
+    addWatcher(name: string, paths: string[] | string) {
         if (this.watchers[name]) throw Error(`name: "${name}" already exists`);
         const watcher = chokidar.watch(paths);
+
         if (this.watchersInitialized && this.watchHandler) {
             const f = this.watchHandler;
             watcher.on('all', (action, file) => f({ name, action, file }));
         }
 
         return this.watchers[name] = watcher;
-
     }
 
     private watchersInitialized = false;
@@ -504,9 +566,16 @@ export async function filesAndDirs(files: string[]) {
     return [fls, dirs];
 }
 
+export const logCl = (txt: string, color: 'red' | 'green' | 'blue' | 'yellow' | 'white' = 'red') => log(chalk.bold[color](txt));
+
 export function logAndExit(txt: string, color: 'red' | 'green' | 'blue' | 'yellow' | 'white' = 'red') {
     log(chalk.bold[color](txt));
     return process.exit();
+}
+
+export function logAndThrow(txt: string, color: 'red' | 'green' | 'blue' | 'yellow' | 'white' = 'red') {
+    log(chalk.bold[color](txt));
+    throw new Error();
 }
 
 export const makeJoinFct = (rootDir: string) => <D extends string | string[]>(toJoin: D): D => {
