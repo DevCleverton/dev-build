@@ -1,6 +1,6 @@
 import path, { dirname, resolve } from 'path';
 import chokidar from 'chokidar';
-import { filesAndDirs, genWatchPaths, nodeFlags, onProcessEnd, ProcessManager, waitForFSWatchersReady } from './general.utils';
+import { filesAndDirs, genWatchPaths, logCl, nodeFlags, onProcessEnd, ProcessManager, waitForFSWatchersReady } from './general.utils';
 
 export async function runNodejs(opts: {
     /** Entry file of node .js or .ts file. */
@@ -18,15 +18,14 @@ export async function runNodejs(opts: {
     const { exts = ['ts', 'js', 'json'], nodeArgs = [], runOnce } = opts;
     const entryFile = path.resolve(opts.entryFile);
     const watch = (opts.watchDirs || [dirname(entryFile)]).map(fl => resolve(fl));
-    const [watchFiles, watchDirs] = await filesAndDirs(watch);
-
+    const [watchFiles, watchDirs] = filesAndDirs(watch);
     onProcessEnd(() => {
-        app.kill();
+        app?.kill();
         watcher?.close();
     });
-
+    
     const args = [...nodeFlags.register, entryFile, ...nodeArgs];
-    const app = new ProcessManager('node', args);
+    const app = new ProcessManager('node', args, './');
 
     const jsWatch = genWatchPaths(watchDirs, exts);
 

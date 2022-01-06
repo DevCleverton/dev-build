@@ -9,8 +9,7 @@
     "/dist"
   ],
   "bin": {
-    "build-dev": "./dist/cli.js",
-    "dev-run:once": "node --trace-warnings -r esbuild-register build.config.ts"
+    "build-dev": "./dist/cli.js"
   },
   "repository": {
     "type": "git",
@@ -18,7 +17,7 @@
   },
   "scripts": {
     "pub": "yarn run lint && yarn run build && npm publish",
-    "test": "node --trace-warnings -r esbuild-register build.config.ts",
+    "test": "node --unhandled-rejections=strict --enable-source-maps --trace-warnings -r esbuild-register build.config.ts",
     "build": "node --trace-warnings -r esbuild-register build.config.ts prep:dist && tsc",
     "lint": "eslint ./src --ext .ts",
     "test-bin": "build-dev"

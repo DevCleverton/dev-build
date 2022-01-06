@@ -4,12 +4,13 @@ import { networkInterfaces } from 'os';
 import postCssPlugin from "esbuild-plugin-postcss2";
 import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objKeys, objKeyVals, objVals, rand } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
-import path, { join } from 'path';
+import path, { join, resolve } from 'path';
 import chokidar from 'chokidar';
 import chalk from 'chalk';
 import readline from 'readline';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { ChildProcessByStdio, ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
+import { lstatSync } from 'fs';
 
 const { log } = console;
 
@@ -26,15 +27,20 @@ export type BrowserTranspiler = (entryFile: string, toDir: string, opts?: {chang
 export class BuilderUtil2 {
     private watchers: Dict<chokidar.FSWatcher> = {};
     private watchHandler?: WatchHandler;
+    private onWatchersReady?: () => unknown | Promise<unknown>;
+    private watchersInitData?: WatchInit;
 
     constructor(
         addWatchers?: WatchInit,
         watchHandler?: WatchHandler,
+        onWatchersReady?: () => unknown,
     ) {
         onProcessEnd(() => objVals(this.watchers).forEach(w => w?.close()));
 
         this.watchHandler = watchHandler;
-        if (addWatchers) this.initWatchers({ addWatchers, watchHandler });
+        this.onWatchersReady = onWatchersReady;
+        this.watchersInitData = addWatchers;
+        if (addWatchers) this.initWatchers({ addWatchers, watchHandler, onWatchersReady });
     }
     
     async addWatcher(name: string, paths: string[] | string) {
@@ -55,15 +61,17 @@ export class BuilderUtil2 {
     
     async initWatchers(opts: {
         addWatchers?: WatchInit,
-        watchHandler?: WatchHandler
+        watchHandler?: WatchHandler,
+        onWatchersReady?: () => unknown,
     }): Promise<true> {
-        const { addWatchers, watchHandler } = opts;
+        const { addWatchers, watchHandler, onWatchersReady } = opts;
 
+        // return;
         await this.removeWatchers(objKeys(this.watchers));
-        
-        if (addWatchers) {
-            const arr = isType(addWatchers, 'array') ?
-                addWatchers : objKeyVals(addWatchers).map(o => ({ name: o.key, paths: o.val }));
+        if (addWatchers || this.watchersInitData) {
+            const addW = this.watchersInitData = addWatchers || this.watchersInitData as WatchInit;
+            const arr = isType(addW, 'array') ?
+                addW : objKeyVals(addW).map(o => ({ name: o.key, paths: o.val }));
 
             const p = arr.map(({ name, paths }) => !isType(paths, 'null') && this.addWatcher(name, paths));
             await Promise.all(p);
@@ -71,10 +79,16 @@ export class BuilderUtil2 {
 
         const watchers = Object.entries(this.watchers);
         await waitForFSWatchersReady(watchers.map(([, w]) => w));
-
+        // Watch handlers
         if (watchHandler || this.watchHandler) {
-            const f = this.watchHandler = watchHandler || this.watchHandler as WatchHandler;
-            watchers.forEach(([name, w]) => w.on('all', (action, file) => f({ name, action, file })));
+            const fct = this.watchHandler = watchHandler || this.watchHandler as WatchHandler;
+            watchers.forEach(([name, w]) => w.on('all', (action, file) => fct({ name, action, file })));
+        }
+
+        // Code to run when all watchers are initialized
+        if (onWatchersReady || this.onWatchersReady) {
+           const fct = this.onWatchersReady = onWatchersReady || this.onWatchersReady as () => unknown;
+           fct(); 
         }
 
         return true;
@@ -276,7 +290,7 @@ export function buildLogStart(opts: {
 }) {
     const { frames, interval: frameMs } = spinners[rand(0, spinners.length - 1)];
     const { from, to, root } = opts;
-    const fromTo = `[${chalk.green(from).replace(root, '')}] ${chalk.yellow`-→`} [${chalk.green(to).replace(root, '')}]`;
+    const fromTo = `[${chalk.green(from).replace(root, '')}] ${chalk.yellow('-→')} [${chalk.green(to).replace(root, '')}]`;
 
     const timeStart = Date.now();
     const itv = interval((i) => {
@@ -284,7 +298,7 @@ export function buildLogStart(opts: {
 
         readline.clearLine(process.stdout, 0);
         readline.cursorTo(process.stdout, 0);
-        process.stdout.write(`> ${frames[i % frames.length]} ${chalk.blueBright`Building`} ${(t / 1000).toFixed(2)}s: ${fromTo}`);
+        process.stdout.write(`> ${frames[i % frames.length]} ${chalk.blue('Building')} ${(t / 1000).toFixed(2)}s: ${fromTo}`);
     }, frameMs * 1.5);
 
     return {
@@ -437,12 +451,13 @@ export function network() {
 }
 
 export class ProcessManager {
-    private app: ChildProcessWithoutNullStreams;
+    private app: ChildProcessByStdio<null, null, null> | ChildProcessWithoutNullStreams;
     private appStartTime = 0;
 
     constructor(
         private readonly command: string,
         private readonly args?: string[],
+        private readonly projectRoot?: string,
     ) {
         this.app = this.spawnChild();
     }
@@ -470,12 +485,32 @@ export class ProcessManager {
     });
 
     private spawnChild = () => {
+        const root = this.projectRoot ? resolve(this.projectRoot) : null;
         const app = spawn(this.command, this.args || []);
-        app.stdout.pipe(process.stdout);
-        app.stderr.pipe(process.stderr);
 
-        app.on('spawn', () => this.appStartTime = Date.now());
-        app.on('exit', (_, signal) => {
+        app.stdout.pipe(process.stdout);
+        app.stderr.on('data', (data) => {
+            const err: string = data.toString();
+            const str = err.replace('Error: \r', '');
+            const arr = str.split('\n')
+            .filter(x => x
+                && x.includes('    at ')
+                && !x.includes('node:internal')
+                && !x.includes('\\node_modules\\')
+            )
+            .map(s => s.match(/\(([^)]+)\)/)).filter(x => x)
+            .map((x, i) => {
+                const str = `[at-${i}]: [${chalk.green((x as RegExpMatchArray)[1])}]`;
+                return root ? str.replace(root, '') : str;
+            });
+
+            logCl('\nERROR:');
+            log(arr.join('\n') + '\n');
+            log(err);
+        });
+
+        app.addListener('spawn', () => this.appStartTime = Date.now());
+        app.addListener('exit', (_, signal) => {
             const time = chalk.yellow(timeString(Date.now() - this.appStartTime));
             log(`> ${chalk.green('Nodejs')}: | time: ${time} | exit: ${chalk.blue(signal)} |`);
             this.kill();
@@ -548,21 +583,20 @@ export async function waitForFSWatchersReady(watchers: (undefined | null | false
     const arr = watchers.filter(x => x) as chokidar.FSWatcher[];
     const n = arr.length;
     if (!n) return;
-
+    
     let i = 0;
-
+    
     await (new Promise((res) =>
         arr.forEach(w => w.once('ready', () => (++i === n) && res(true)))));
 }
 
-export async function filesAndDirs(files: string[]) {
+export function filesAndDirs(files: string[]) {
     const fls: string[] = [];
     const dirs: string[] = [];
 
-    const p = files.map(async fl =>
-        (await lstat(fl)).isDirectory() ? dirs.push(fl) : fls.push(fl));
+    files.forEach(async fl =>
+        lstatSync(fl).isDirectory() ? dirs.push(fl) : fls.push(fl));
 
-    await Promise.all(p);
     return [fls, dirs];
 }
 
@@ -586,9 +620,10 @@ export const makeJoinFct = (rootDir: string) => <D extends string | string[]>(to
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const arrEnsure = <T>(x: T): T extends Array<unknown> ? T : T[] => isType(x, 'array') ? x as any : [x];
 
-export const nodeFlags = {
-    register: ['--enable-source-maps', "--experimental-loader", "--trace-warnings", "-r", "esbuild-register"],
-    regular: ['--enable-source-maps', "--experimental-loader", "--trace-warnings"],
+// '--unhandled-rejections=warn' set to warn because otherwise it will fail and exit silently
+const regular = ['--unhandled-rejections=warn', '--enable-source-maps', "--trace-warnings"];
+export const nodeFlags = { // "--experimental-loader"
+    regular, register: [...regular, "-r", "esbuild-register"],
 };
 
 export function configEnv(path: string) {
@@ -602,4 +637,9 @@ export function configEnv(path: string) {
     }
 
     return parsed as Dict<string> || false;
+}
+
+export function changeExtension(file: string, extension: string) {
+    const basename = path.basename(file, path.extname(file))
+    return path.join(path.dirname(file), basename + extension)
 }

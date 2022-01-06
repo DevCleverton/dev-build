@@ -1,5 +1,5 @@
 import { resolve } from 'path';
-import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
+import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser, runBrowser } from './src';
 import { BuilderUtil } from './src/general.utils';
 
 (async function run([type]) {
@@ -14,7 +14,9 @@ import { BuilderUtil } from './src/general.utils';
         case 'play:nodejs':
             return nodejsPlay();
         case 'run:nodejs':
-            return runNodejs({ entryFile: './server/main' }); // ./server/main.ts
+            return runNodejs({ entryFile: 'src/browser.run.ts' }); // ./server/main.ts
+        case 'run:browser':
+            return runBrowser({ entryHTML: 'src/assets/browser/index.html' });
         case 'dev:browser':
             return devBrowser({
                 fromDir: 'browser', // ./browser
