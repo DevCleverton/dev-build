@@ -1,7 +1,7 @@
 import { ensureDir } from "fs-extra";
 import path, { join } from "path";
 import { devNodejs as devBuildNodeJs } from "./nodejs.dev";
-import { ensureStarterFiles } from "./general.utils";
+import { ensureStarterFiles } from "./utils/general.utils";
 
 export async function nodejsPlay(opts: {
     /** Default: `"./"` */

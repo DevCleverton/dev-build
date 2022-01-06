@@ -1,6 +1,6 @@
 import { ensureDir } from 'fs-extra';
 import path, { join } from 'path';
-import { ensureStarterFiles } from './general.utils';
+import { ensureStarterFiles } from './utils/general.utils';
 import { devBrowser } from './browser.dev';
 
 /** Playground for quickly spinning up new ideas without the overhead of the whole project. */

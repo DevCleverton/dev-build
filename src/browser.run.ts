@@ -1,9 +1,10 @@
-import browserSync from "browser-sync";
-import { dirname } from 'path';
-import { makeJoinFct, BuilderUtil2, onProcessEnd } from "./general.utils";
 import type { RunBrowserOpts } from "./general.types";
-import { prepRunBrowserPaths, runBrowserWatchHandlerInit } from "./utils/browser-run.util";
 import type { Dict } from "@giveback007/util-lib";
+import browserSync from "browser-sync";
+import { prepRunBrowserPaths, runBrowserWatchHandlerInit } from "./utils/browser-run.util";
+import { makeJoinFct, onProcessEnd, genWatchPaths } from "./utils/general.utils";
+import { dirname, join } from 'path';
+import { FileWatchUtil } from "./utils/watcher.util";
 
 const { log } = console;
 
@@ -36,21 +37,17 @@ export async function runBrowser(opts: RunBrowserOpts) {
      * That's why this logic is using array.
      */
 
-    /*
-     * Watch the dirs now, and if err don't exit just reload on changed
-     */
-
     // 1. every time entry changes need to check for if files changed
     // 2. handle throw errors in watch handler
 
     // TODO check what happens when no public folder
     // TODO test with multiple css and js entries
     const watch: Dict<string | string[] | null> = {
-        // entry: entryHTML,
-        // js: genWatchPaths(watchDirs, jsExts),
-        // css: genWatchPaths(watchDirs, cssExts),
-        // copy: copyFiles || null,
-        // '*public': copyFiles ? null : join(dirname(entryHTML[0]), 'public'),
+        entry: entryHTML,
+        js: genWatchPaths(watchDirs, jsExts),
+        css: genWatchPaths(watchDirs, cssExts),
+        copy: copyFiles || null,
+        '*public': copyFiles ? null : join(dirname(entryHTML[0]), 'public'),
     }
 
     const watchHandler = runBrowserWatchHandlerInit({
@@ -66,7 +63,7 @@ export async function runBrowser(opts: RunBrowserOpts) {
 
     }
 
-    const builder = new BuilderUtil2(watch, watchHandler, onReady);
+    const builder = new FileWatchUtil(watch, watchHandler, onReady);
     // onHtml(entries[0])
     
     // i want to await watcher so this way I know I can start listening?

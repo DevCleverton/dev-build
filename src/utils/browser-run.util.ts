@@ -3,8 +3,9 @@ import type { BrowserSyncInstance } from "browser-sync";
 import { debounceTimeOut, Dict, equalAny, objKeys } from "@giveback007/util-lib";
 import { pathExists, readFile } from "fs-extra";
 import path, { basename, dirname, extname, join } from "path";
-import { arrEnsure, changeExtension, logAndExit, logAndThrow, logCl, makeJoinFct, WatchEvent, WatchHandlerOpts } from "../general.utils";
+import { arrEnsure, changeExtension, logAndExit, logAndThrow, logCl, makeJoinFct } from "./general.utils";
 import { valid, parse as parseHTML } from "node-html-parser";
+import type { WatchEvent, WatchHandlerOpts } from "./watcher.util";
 const { log } = console;
 
 
@@ -108,7 +109,7 @@ export const runBrowserWatchHandlerInit = (opts: WatchHandlerInitOpts) => {
 
 
 /* -- On HTML -- */
-async function onHtml(entry: string) {
+export async function onHtml(entry: string) {
     const _ = {
         jsAtt: 'build-dev-js',
         cssAtt: 'build-dev-css'

@@ -2,7 +2,11 @@ import type { DevBuildOptions } from './general.types';
 import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
-import { BuilderUtil, buildLogStart, WatchEvent, genWatchPaths, onProcessEnd, ProcessManager, transpileNode, waitForFSWatchersReady, nodeFlags } from './general.utils';
+import { buildLogStart, genWatchPaths, onProcessEnd, waitForFSWatchersReady } from './utils/general.utils';
+import { BuilderUtil } from './utils/builder.util';
+import { transpileNode } from './utils/transpile.util';
+import type { WatchEvent } from './utils/watcher.util';
+import { ChildProcessManager, nodeFlags } from './utils/child-process.util';
 
 export async function devNodejs(opts: DevBuildOptions & {
     /** List of js/ts/etc.. extensions to watch for changes. This will build and reload the browser.
@@ -88,7 +92,7 @@ export async function devNodejs(opts: DevBuildOptions & {
     await builder.build();
     await builder.copy();
     
-    const app = new ProcessManager('node', [...nodeFlags.regular, outFile, ...nodeArgs]);
+    const app = new ChildProcessManager('node', [...nodeFlags.regular, outFile, ...nodeArgs]);
     
     jsWatcher.on('all', () => {
         watchHandler({ type: 'js' });

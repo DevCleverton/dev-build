@@ -4,7 +4,7 @@ import { runNodejs, browserPlay, nodejsPlay } from '.';
 import { equalAny } from '@giveback007/util-lib';
 import { resolve } from 'path';
 import { existsSync } from 'fs-extra';
-import { logAndExit } from './general.utils';
+import { logAndExit } from './utils/general.utils';
 
 const err = logAndExit;
 

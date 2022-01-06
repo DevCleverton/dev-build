@@ -3,8 +3,10 @@ import browserSync from "browser-sync";
 import historyApiFallback from 'connect-history-api-fallback';
 import path, { join } from 'path';
 import { debounceTimeOut, Dict, objKeyVals } from '@giveback007/util-lib';
-import { BuilderUtil, network, onProcessEnd, transpileBrowser, genWatchPaths, configEnv, makeJoinFct, arrEnsure, logAndExit } from './general.utils';
+import { network, onProcessEnd, genWatchPaths, configEnv, makeJoinFct, arrEnsure, logAndExit } from './utils/general.utils';
 import chalk from 'chalk';
+import { BuilderUtil } from "./utils/builder.util";
+import { transpileBrowser } from "./utils/transpile.util";
 
 const { log } = console;
 
