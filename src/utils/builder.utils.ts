@@ -32,8 +32,8 @@ export class BuilderUtil {
     private readonly copyFiles: CopyFromTo[] = [];
 
     constructor(opts: BuilderOpt) {
-        onProcessEnd(() =>
-            objVals(this.watchers).forEach(w => w?.close()));
+        // onProcessEnd(() =>
+        //     objVals(this.watchers).forEach(w => w?.close()));
 
         this.projectRoot = path.resolve(opts.projectRoot);
         this.fromDir = path.resolve(opts.fromDir);

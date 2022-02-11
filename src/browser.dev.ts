@@ -5,7 +5,7 @@ import path, { join } from 'path';
 import { debounceTimeOut, Dict, objKeyVals } from '@giveback007/util-lib';
 import { network, onProcessEnd, genWatchPaths, configEnv, makeJoinFct, arrEnsure, logAndExit } from './utils/general.utils';
 import chalk from 'chalk';
-import { BuilderUtil } from "./utils/builder.util";
+import { BuilderUtil } from "./utils/builder.utils";
 import { transpileBrowser } from "./utils/transpile.util";
 
 const { log } = console;
@@ -54,9 +54,14 @@ export async function devBrowser(opts: DevBuildOptions & {
 
     // clearing and canceling on exit //
     onProcessEnd(() => {
-        bs?.pause();
-        bs?.cleanup();
-        bs?.exit();
+        try {
+            bs?.pause();
+            bs?.cleanup();
+            bs?.exit();
+        } catch {
+            console.log('failed to clean up browserSync');
+        }
+
         process.exit();
     });
 

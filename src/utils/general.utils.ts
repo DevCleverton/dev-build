@@ -7,7 +7,7 @@ import readline from 'readline';
 import type { FSWatcher } from 'chokidar';
 import { config } from 'dotenv';
 import { lstatSync } from 'fs';
-import { BuilderUtil } from './builder.util';
+import { BuilderUtil } from './builder.utils';
 
 const { log } = console;
 

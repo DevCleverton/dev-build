@@ -3,7 +3,7 @@ import chokidar from 'chokidar';
 import path, { join, resolve } from 'path';
 import { debounceTimeOut, isType } from '@giveback007/util-lib';
 import { buildLogStart, genWatchPaths, onProcessEnd, waitForFSWatchersReady } from './utils/general.utils';
-import { BuilderUtil } from './utils/builder.util';
+import { BuilderUtil } from './utils/builder.utils';
 import { transpileNode } from './utils/transpile.util';
 import type { WatchEvent } from './utils/watcher.util';
 import { ChildProcessManager, nodeFlags } from './utils/child-process.util';

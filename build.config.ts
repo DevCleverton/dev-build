@@ -1,6 +1,6 @@
 import { resolve } from 'path';
-import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser, runBrowser } from './src';
-import { BuilderUtil } from './src/general.utils';
+import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
+import { BuilderUtil } from './src/utils/builder.utils';
 
 (async function run([type]) {
     switch (type) {
@@ -15,11 +15,11 @@ import { BuilderUtil } from './src/general.utils';
             return nodejsPlay();
         case 'run:nodejs':
             return runNodejs({ entryFile: 'src/browser.run.ts' }); // ./server/main.ts
-        case 'run:browser':
-            return runBrowser({ entryHTML: 'src/assets/browser/index.html' });
+        // case 'run:browser':
+        //     return runBrowser({ entryHTML: 'src/assets/browser/index.html' });
         case 'dev:browser':
             return devBrowser({
-                fromDir: 'browser', // ./browser
+                fromDir: 'test/dev-browser', // ./browser
                 entryFile: 'index.tsx', // ./browser/index.tsx
                 toDir: '.cache/web', // ./.cache/web
                 // copy ./browser/index.html & ./browser/public/
