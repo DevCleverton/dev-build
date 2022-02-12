@@ -1,7 +1,8 @@
 import type { BuildOptions, BuildResult } from 'esbuild';
 import { build as esbuild } from 'esbuild';
 import { networkInterfaces } from 'os';
-import postCssPlugin from "esbuild-plugin-postcss2";
+import { sassPlugin } from 'esbuild-sass-plugin';
+
 import { debounceTimeOut, Dict, interval, isType, min, minAppend, msToTime, objKeyVals, objVals, rand } from '@giveback007/util-lib';
 import { copy, ensureDir, existsSync, lstat, mkdir, readdirSync, remove } from 'fs-extra';
 import path, { join } from 'path';
@@ -266,7 +267,7 @@ export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts
         define: defineUtil(opts.envVars),
         bundle: true,
         minify: true,
-        plugins: [postCssPlugin({ plugins: [ (x: unknown) => x ] }),],
+        plugins: [sassPlugin()],
         loader,
     };
 
