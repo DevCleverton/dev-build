@@ -66,8 +66,9 @@ export async function devBrowser(opts: DevBuildOptions & {
             const fileVars = configEnv(joinRoot(fl));
             if (!fileVars) logAndExit('Env file errors.');
 
-            objKeyVals(fileVars as Dict<string>)
-                .map(({ key, val }) => envVars[key] = val);
+            objKeyVals(fileVars as Dict<string>).map(({ key, val }) =>
+                envVars[key] = val === 'true' || val === 'false' ? val : `"${val}"`
+            );
         });
         
         objKeyVals(define)

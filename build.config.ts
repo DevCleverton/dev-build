@@ -17,11 +17,12 @@ import { BuilderUtil } from './src/general.utils';
             return runNodejs({ entryFile: './server/main' }); // ./server/main.ts
         case 'dev:browser':
             return devBrowser({
-                fromDir: 'browser', // ./browser
+                fromDir: 'playground/web', // ./browser
                 entryFile: 'index.tsx', // ./browser/index.tsx
                 toDir: '.cache/web', // ./.cache/web
                 // copy ./browser/index.html & ./browser/public/
-                copyFiles: ['index.html', 'public']
+                copyFiles: ['index.html', 'public'],
+                // env: { envFile: '.key' }
             });
         case 'dev:nodejs':
             return devNodejs({
