@@ -267,6 +267,7 @@ export const transpileBrowser: BrowserTranspiler = async (entryFile, toDir, opts
         define: defineUtil(opts.envVars),
         bundle: true,
         minify: true,
+        sourcemap: true,
         plugins: [sassPlugin()],
         loader,
     };
