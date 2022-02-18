@@ -53,7 +53,7 @@ import historyApiFallback from 'connect-history-api-fallback';
                 ghostMode: false,
             });
 
-            break;
+            return;
         } default:
             throw new Error(`"${type}" not implemented`);
     }
