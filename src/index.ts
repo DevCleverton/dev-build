@@ -3,6 +3,7 @@
 // TODO: browser & nodejs debug in vscode
 
 export * from './browser.dev';
+export * from './browser.build';
 export * from './browser.play';
 export * from './nodejs.dev';
 export * from './nodejs.play';

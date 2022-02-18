@@ -1,6 +1,6 @@
 {
   "name": "build-dev",
-  "version": "0.2.2",
+  "version": "0.3.1",
   "description": "Make building projects simple",
   "license": "MIT",
   "main": "dist/index.js",
@@ -17,16 +17,18 @@
   },
   "scripts": {
     "pub": "yarn run lint && yarn run build && npm publish",
-    "test": "node --trace-warnings -r esbuild-register build.config.ts",
-    "build": "node --trace-warnings -r esbuild-register build.config.ts prep:dist && tsc",
+    "test": "yarn run-ts build.config.ts",
+    "test:build": "yarn run-ts build.config.ts build:browser",
+    "build": "yarn run-ts build.config.ts prep:dist && tsc",
     "lint": "eslint ./src --ext .ts",
-    "test-bin": "build-dev"
+    "test-bin": "build-dev",
+    "run-ts": "node --trace-warnings -r esbuild-register"
   },
   "dependencies": {
     "@giveback007/util-lib": "0.24.3",
     "browser-sync": "^2.27.7",
     "dotenv": "^16.0.0",
-    "esbuild": "^0.14.21",
+    "esbuild": "^0.14.23",
     "esbuild-register": "^3.3.2",
     "esbuild-sass-plugin": "^2.2.3",
     "fs-extra": "^10.0.0",

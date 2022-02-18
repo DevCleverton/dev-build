@@ -1,6 +1,8 @@
 import { resolve } from 'path';
-import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser } from './src';
+import { runNodejs, browserPlay, nodejsPlay, devNodejs, devBrowser, buildBrowser } from './src';
 import { BuilderUtil } from './src/general.utils';
+import browserSync from "browser-sync";
+import historyApiFallback from 'connect-history-api-fallback';
 
 (async function run([type]) {
     switch (type) {
@@ -30,7 +32,30 @@ import { BuilderUtil } from './src/general.utils';
                 entryFile: 'main.ts', // ./server/main.ts
                 toDir: '.cache/node' // ./.cache/node
             });
-        default:
+        case 'build:browser': {
+            await buildBrowser({
+                fromDir: 'playground/web', // ./browser
+                entryFile: 'index.tsx', // ./browser/index.tsx
+                toDir: '.dist/web', // ./.cache/web
+                // copy ./browser/index.html & ./browser/public/
+                copyFiles: ['index.html', 'public'],
+                // env: { envFile: '.key' }
+            });
+
+            const bs = browserSync.create();
+            bs.init({
+                server: '.dist/web',
+                middleware: [ historyApiFallback() ],
+                reloadDelay: 0,
+                reloadDebounce: 100,
+                reloadOnRestart: true,
+                // port,
+                ghostMode: false,
+            });
+
+            break;
+        } default:
             throw new Error(`"${type}" not implemented`);
     }
 })(process.argv.slice(2));
+

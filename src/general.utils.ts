@@ -26,7 +26,7 @@ export type BuilderOpt = {
     toDir: string;
     buildFct: () => Promise<BuildResult | void>;
     copyFiles?: string[];
-    watchHandler?: (opts: { name: string; file: string; action: WatchEvent }) => unknown; 
+    watchHandler?: (opts: { name: string; file: string; action: WatchEvent }) => unknown;
 }
 
 export class BuilderUtil {
@@ -63,7 +63,6 @@ export class BuilderUtil {
         }
 
         return this.watchers[name] = watcher;
-
     }
 
     private watchersInitialized = false;
@@ -99,7 +98,11 @@ export class BuilderUtil {
         const { logTime = true } = opts;
 
         const logger = logTime && buildLogStart({ from: this.fromDir, to: this.toDir, root: this.projectRoot });
-        await this.buildFct();
+        try {
+            await this.buildFct();
+        } catch {
+            log(chalk.red('Build Error'));
+        }
         
         if (logger) logger.end();
     }
@@ -138,7 +141,7 @@ export class BuilderUtil {
     };
 
     fileCopyAction = <O extends { file: string; action: WatchEvent; }>(actions: O | O[]) => {
-        const arr = (isType(actions, 'array') ? actions : [actions]).map(({ file, action }) => ({
+        const arr = arrEnsure(actions).map(({ file, action }) => ({
             from: file, action, to: file.replace(this.fromDir, this.toDir)
         }));
 
