@@ -67,12 +67,11 @@ export async function devBrowser(opts: DevBuildOptions & {
             if (!fileVars) logAndExit('Env file errors.');
 
             objKeyVals(fileVars as Dict<string>).map(({ key, val }) =>
-                envVars[key] = val === 'true' || val === 'false' ? val : `"${val}"`
-            );
+                envVars[key] = val === 'true' || val === 'false' ? val : `"${val}"`);
         });
         
         objKeyVals(define)
-            .map(({ key, val }) => envVars[key] = val);
+            .map(({ key, val }) => envVars[key] = val === 'true' || val === 'false' ? val : `"${val}"`);
     }
 
     // initialized builder //
@@ -114,13 +113,13 @@ export async function devBrowser(opts: DevBuildOptions & {
     bs.watch(
         jsWatch as never as string,
         { ignoreInitial: true },
-        () => watchHandler('js')
+        () => watchHandler('js'),
     );
     
     bs.watch(
         cssWatch as never as string,
         { ignoreInitial: true },
-        () => watchHandler('css')
+        () => watchHandler('css'),
     );
 
     if (builder.info().copyFiles.length)

@@ -41,7 +41,7 @@ export async function buildBrowser(opts: BuildOptions & {
         });
         
         objKeyVals(define)
-            .map(({ key, val }) => envVars[key] = val);
+            .map(({ key, val }) => envVars[key] = val === 'true' || val === 'false' ? val : `"${val}"`);
     }
 
     
